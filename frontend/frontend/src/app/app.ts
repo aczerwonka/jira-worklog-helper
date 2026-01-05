@@ -262,7 +262,8 @@ export class App implements OnInit {
 
   saveWorklog(): void {
     if (this.worklogForm.invalid) {
-      alert('Please fill in all required fields');
+      // alert('Please fill in all required fields');
+      this.showToast('Please fill in all required fields');
       return;
     }
 
@@ -280,7 +281,8 @@ export class App implements OnInit {
 
     this.worklogService.createWorklog(payload).subscribe({
       next: (response) => {
-        alert('Worklog created successfully');
+        // alert('Worklog created successfully');
+        this.showToast('Worklog created successfully');
         this.worklogForm.reset();
         this.selectedTicket.set('');
         this.selectedTicketSummary.set('');
@@ -292,10 +294,70 @@ export class App implements OnInit {
       },
       error: (err) => {
         console.error('Error saving worklog', err);
-        alert('Error saving worklog: ' + (err.error?.message || err.message));
+        // alert('Error saving worklog: ' + (err.error?.message || err.message));
+        this.showToast('Error saving worklog: ' + (err.error?.message || err.message));
       },
       complete: () => this.isLoadingSave.set(false),
     });
+  }
+
+  // Simple toast implementation: shows a message in the bottom-right for a short time
+  private toastTimer: any = null;
+  showToast(message: string, timeoutMs: number = 2000): void {
+    try {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      // create toast element
+      const toast = document.createElement('div');
+      toast.textContent = message;
+      toast.setAttribute('role', 'status');
+      toast.style.background = '#111827';
+      toast.style.color = '#fff';
+      toast.style.padding = '10px 14px';
+      toast.style.borderRadius = '8px';
+      toast.style.boxShadow = '0 4px 12px rgba(2,6,23,0.2)';
+      toast.style.maxWidth = '320px';
+      toast.style.fontSize = '13px';
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 160ms ease-in-out, transform 160ms ease-in-out';
+      toast.style.transform = 'translateY(8px)';
+
+      container.appendChild(toast);
+
+      // force reflow to enable transition
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      toast.offsetHeight;
+
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+
+      // remove after timeout
+      const t = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(() => {
+          try { container.removeChild(toast); } catch (e) { /* ignore */ }
+        }, 180);
+      }, timeoutMs);
+
+      // keep reference to allow clearing if needed
+      this.toastTimer = t;
+    } catch (e) {
+      // fallback to alert if DOM not available
+      try { alert(message); } catch (_) { /* no-op */ }
+    }
+  }
+
+  clearToast(): void {
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+      this.toastTimer = null;
+    }
+    const container = document.getElementById('toast-container');
+    if (container) {
+      container.innerHTML = '';
+    }
   }
 
   // Build a started timestamp from YYYY-MM-DD and local timezone offset
