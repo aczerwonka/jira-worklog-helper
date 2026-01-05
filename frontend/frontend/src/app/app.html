@@ -82,7 +82,7 @@
                   <span class="badge total-time">{{ sumWorkTime(dayObj.worklogs) }}</span>
                 </div>
                 <div class="day-worklogs" *ngIf="dayObj.worklogs && dayObj.worklogs.length > 0">
-                  <div class="worklog-badge" *ngFor="let worklog of dayObj.worklogs">
+                  <div class="worklog-badge" *ngFor="let worklog of dayObj.worklogs" (click)="fillFormFromWorklog(worklog); $event.stopPropagation()">
                     <span class="badge-ticket">{{ displayTicket(worklog) }}</span>
                     <span class="badge-time">{{ displayWorkTime(worklog) }}</span>
                   </div>
@@ -111,7 +111,7 @@
                 </div>
                  <div class="week-day-worklogs">
                   <div *ngIf="dayObj.worklogs && dayObj.worklogs.length > 0; else emptyDay">
-                    <div class="week-worklog-item" *ngFor="let worklog of dayObj.worklogs">
+                    <div class="week-worklog-item" *ngFor="let worklog of dayObj.worklogs" (click)="fillFormFromWorklog(worklog); $event.stopPropagation()">
                       <span class="work-ticket">{{ displayTicket(worklog) }}</span>
                       <span class="work-time">{{ displayWorkTime(worklog) }}</span>
                     </div>
@@ -132,7 +132,7 @@
               </div>
               <div class="day-worklogs-list">
                 <div *ngIf="calendarDays()[0].worklogs && calendarDays()[0].worklogs.length > 0; else noDayWorklogs">
-                  <div class="day-worklog-entry" *ngFor="let worklog of calendarDays()[0].worklogs">
+                  <div class="day-worklog-entry" *ngFor="let worklog of calendarDays()[0].worklogs" (click)="fillFormFromWorklog(worklog); $event.stopPropagation()">
                     <div class="entry-ticket">{{ displayTicket(worklog) }}</div>
                     <div class="entry-summary">{{ displaySummary(worklog) }}</div>
                     <div class="entry-time">{{ displayWorkTime(worklog) }}</div>

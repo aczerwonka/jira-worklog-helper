@@ -56,6 +56,6 @@ export interface JiraWorklogResponse {
 
 export interface WorklogEntry {
   date: string; // YYYY-MM-DD
-  workTime: string; // human readable e.g. "2 hours 30 minutes"
+  workTime: string; // human readable e.g. "2 godz. 30 min"
   ticketNumber: string; // Jira issue key
 }

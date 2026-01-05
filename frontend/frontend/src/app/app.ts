@@ -159,14 +159,14 @@ export class App implements OnInit {
     this.worklogForm.patchValue({ ticketKey: favorite.ticketKey });
     this.selectedTicket.set(favorite.ticketKey);
     this.fetchIssueSummary(favorite.ticketKey);
-    
+
     // Set comment
     this.worklogForm.patchValue({ comment: favorite.comment });
-    
+
     // Set time (convert minutes to seconds)
     const timeInSeconds = favorite.defaultTimeMinutes * 60;
     this.worklogForm.patchValue({ timeSpentSeconds: timeInSeconds });
-    
+
     // Update hour/minute signals
     const hours = Math.floor(favorite.defaultTimeMinutes / 60);
     const minutes = favorite.defaultTimeMinutes % 60;
@@ -287,6 +287,8 @@ export class App implements OnInit {
         this.suggestedPrefixes.set([]);
         this.issueSummary.set(null);
         this.loadHistory();
+        // odśwież kalendarz po zapisaniu nowego worklogu
+        this.refreshCalendarAndWorklogs();
       },
       error: (err) => {
         console.error('Error saving worklog', err);
@@ -544,6 +546,43 @@ export class App implements OnInit {
     }
 
     return totalMinutes;
+  }
+
+  // Fill the form from a clicked calendar worklog; do NOT change the date field
+  fillFormFromWorklog(worklog: any): void {
+    if (!worklog) return;
+
+    const ticket = this.displayTicket(worklog);
+    const summary = this.displaySummary(worklog);
+    // Prefer comment/summary fields if present
+    const comment = worklog.comment || summary || '';
+
+    // Determine seconds: prefer numeric timeSpentSeconds, otherwise parse workTime
+    let seconds = 0;
+    if (typeof worklog.timeSpentSeconds === 'number') {
+      seconds = worklog.timeSpentSeconds;
+    } else if (worklog.workTime) {
+      const mins = this.parseWorkTimeToMinutes(worklog.workTime);
+      seconds = mins * 60;
+    }
+
+    // patch form without touching date
+    this.worklogForm.patchValue({
+      ticketKey: ticket,
+      comment: comment,
+      timeSpentSeconds: seconds || this.worklogForm.get('timeSpentSeconds')?.value,
+    });
+
+    // update signals for UI (ticket and summary)
+    if (ticket) this.selectedTicket.set(ticket);
+    if (summary) this.selectedTicketSummary.set(summary);
+
+    // set hour/minute signals based on seconds
+    const totalMinutes = Math.round((seconds || 0) / 60);
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    this.selectedHours.set(hrs);
+    this.selectedMinutes.set(mins);
   }
 
   // Sumuje pole workTime dla podanej listy worklogów i zwraca sformatowany string, np. "3h 15m" lub "45m"
