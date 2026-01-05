@@ -39,14 +39,14 @@ public class FavoritesService {
                 if (line.isEmpty() || line.startsWith("#")) {
                     continue;
                 }
-                String[] parts = line.split(",", -1);
+                String[] parts = parseCsvLine(line);
                 if (parts.length >= 4) {
                     FavoriteWorklog fav = new FavoriteWorklog();
-                    fav.setId(parts[0].trim());
-                    fav.setTicketKey(parts[1].trim());
-                    fav.setComment(parts[2].trim());
+                    fav.setId(parts[0]);
+                    fav.setTicketKey(parts[1]);
+                    fav.setComment(parts[2]);
                     try {
-                        fav.setDefaultTimeMinutes(Integer.parseInt(parts[3].trim()));
+                        fav.setDefaultTimeMinutes(Integer.parseInt(parts[3]));
                     } catch (NumberFormatException e) {
                         fav.setDefaultTimeMinutes(30); // default
                     }
@@ -140,5 +140,37 @@ public class FavoritesService {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return value;
+    }
+
+    private String[] parseCsvLine(String line) {
+        List<String> fields = new ArrayList<>();
+        StringBuilder currentField = new StringBuilder();
+        boolean inQuotes = false;
+        
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            
+            if (c == '"') {
+                if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                    // Escaped quote
+                    currentField.append('"');
+                    i++; // Skip next quote
+                } else {
+                    // Toggle quote state
+                    inQuotes = !inQuotes;
+                }
+            } else if (c == ',' && !inQuotes) {
+                // Field separator
+                fields.add(currentField.toString().trim());
+                currentField = new StringBuilder();
+            } else {
+                currentField.append(c);
+            }
+        }
+        
+        // Add the last field
+        fields.add(currentField.toString().trim());
+        
+        return fields.toArray(new String[0]);
     }
 }
