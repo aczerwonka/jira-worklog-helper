@@ -40,6 +40,13 @@ export interface FavoriteTicket {
   label: string;
 }
 
+export interface FavoriteWorklog {
+  id?: string;
+  ticketKey: string;
+  comment: string;
+  defaultTimeMinutes: number;
+}
+
 export interface JiraWorklogResponse {
   id: string;
   author: string;

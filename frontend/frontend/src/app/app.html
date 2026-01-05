@@ -164,6 +164,9 @@
 
     <!-- Right Column: Action Panel (Form) -->
     <div class="right-column">
+      <!-- New Favorites Component -->
+      <app-favorites (favoriteSelected)="selectFavoriteWorklog($event)"></app-favorites>
+
       <div class="action-panel">
         <div class="panel-header">
           <h2>Log Work</h2>

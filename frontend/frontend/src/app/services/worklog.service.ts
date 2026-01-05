@@ -8,6 +8,7 @@ import {
   SuggestionRequest,
   SuggestionResponse,
   FavoriteTicket,
+  FavoriteWorklog,
   JiraWorklogResponse,
   WorklogEntry,
 } from '../models/worklog.model';
@@ -46,6 +47,26 @@ export class WorklogService {
   // Get favorite tickets
   getFavorites(): Observable<FavoriteTicket[]> {
     return this.http.get<FavoriteTicket[]>(`${this.apiUrl}/favorites`);
+  }
+
+  // Get favorite worklogs (new enhanced favorites)
+  getFavoriteWorklogs(): Observable<FavoriteWorklog[]> {
+    return this.http.get<FavoriteWorklog[]>(`${this.apiUrl}/favorites/worklogs`);
+  }
+
+  // Add a new favorite worklog
+  addFavoriteWorklog(favorite: FavoriteWorklog): Observable<FavoriteWorklog> {
+    return this.http.post<FavoriteWorklog>(`${this.apiUrl}/favorites/worklogs`, favorite);
+  }
+
+  // Update an existing favorite worklog
+  updateFavoriteWorklog(id: string, favorite: FavoriteWorklog): Observable<FavoriteWorklog> {
+    return this.http.put<FavoriteWorklog>(`${this.apiUrl}/favorites/worklogs/${id}`, favorite);
+  }
+
+  // Delete a favorite worklog
+  deleteFavoriteWorklog(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/favorites/worklogs/${id}`);
   }
 
   // Get worklogs list for a date range

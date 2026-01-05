@@ -3,12 +3,13 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { CommonModule } from '@angular/common';
 import { HttpClientModule } from '@angular/common/http';
 import { WorklogService } from './services/worklog.service';
-import { Worklog, FavoriteTicket, WorklogHistoryItem, JiraIssueSummary, WorklogEntry } from './models/worklog.model';
+import { Worklog, FavoriteTicket, FavoriteWorklog, WorklogHistoryItem, JiraIssueSummary, WorklogEntry } from './models/worklog.model';
+import { FavoritesComponent } from './favorites/favorites.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, HttpClientModule],
+  imports: [CommonModule, ReactiveFormsModule, HttpClientModule, FavoritesComponent],
   templateUrl: './app.html',
   styleUrls: ['./app.scss'],
   providers: [WorklogService],
@@ -151,6 +152,26 @@ export class App implements OnInit {
     this.selectedTicket.set(ticket.key);
     this.selectedTicketSummary.set(ticket.label);
     this.fetchIssueSummary(ticket.key);
+  }
+
+  selectFavoriteWorklog(favorite: FavoriteWorklog): void {
+    // Set ticket key
+    this.worklogForm.patchValue({ ticketKey: favorite.ticketKey });
+    this.selectedTicket.set(favorite.ticketKey);
+    this.fetchIssueSummary(favorite.ticketKey);
+    
+    // Set comment
+    this.worklogForm.patchValue({ comment: favorite.comment });
+    
+    // Set time (convert minutes to seconds)
+    const timeInSeconds = favorite.defaultTimeMinutes * 60;
+    this.worklogForm.patchValue({ timeSpentSeconds: timeInSeconds });
+    
+    // Update hour/minute signals
+    const hours = Math.floor(favorite.defaultTimeMinutes / 60);
+    const minutes = favorite.defaultTimeMinutes % 60;
+    this.selectedHours.set(hours);
+    this.selectedMinutes.set(minutes);
   }
 
   selectHistoryItem(item: WorklogHistoryItem): void {

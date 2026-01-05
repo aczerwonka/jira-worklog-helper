@@ -7,9 +7,11 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,9 +24,11 @@ import com.jiraworklog.worklog_backend.dto.JiraIssueSummary;
 import com.jiraworklog.worklog_backend.dto.JiraSearchResult;
 import com.jiraworklog.worklog_backend.dto.JiraWorklogResponse;
 import com.jiraworklog.worklog_backend.dto.WorklogEntry;
+import com.jiraworklog.worklog_backend.dto.FavoriteWorklog;
 import com.jiraworklog.worklog_backend.service.CsvService;
 import com.jiraworklog.worklog_backend.service.JiraService;
 import com.jiraworklog.worklog_backend.service.SuggestionService;
+import com.jiraworklog.worklog_backend.service.FavoritesService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,14 +41,17 @@ public class WorklogController {
     private final JiraService jiraService;
     private final SuggestionService suggestionService;
     private final CsvService csvService;
+    private final FavoritesService favoritesService;
     
     @Value("${worklog.username:arek}")
     private String worklogUsername;
 
-    public WorklogController(JiraService jiraService, SuggestionService suggestionService, CsvService csvService) {
+    public WorklogController(JiraService jiraService, SuggestionService suggestionService, 
+                           CsvService csvService, FavoritesService favoritesService) {
         this.jiraService = jiraService;
         this.suggestionService = suggestionService;
         this.csvService = csvService;
+        this.favoritesService = favoritesService;
     }
 
     @PostMapping("/api/worklogs")
@@ -94,7 +101,32 @@ public class WorklogController {
 
     @GetMapping("/api/favorites")
     public ResponseEntity<?> getFavorites() {
+        // Keep backward compatibility - return old CSV favorites
         return ResponseEntity.ok(csvService.loadFavoriteTickets());
+    }
+
+    @GetMapping("/api/favorites/worklogs")
+    public ResponseEntity<List<FavoriteWorklog>> getFavoriteWorklogs() {
+        return ResponseEntity.ok(favoritesService.getAllFavorites());
+    }
+
+    @PostMapping("/api/favorites/worklogs")
+    public ResponseEntity<FavoriteWorklog> addFavoriteWorklog(@RequestBody FavoriteWorklog favorite) {
+        FavoriteWorklog created = favoritesService.addFavorite(favorite);
+        return ResponseEntity.ok(created);
+    }
+
+    @PutMapping("/api/favorites/worklogs/{id}")
+    public ResponseEntity<FavoriteWorklog> updateFavoriteWorklog(
+            @PathVariable String id, @RequestBody FavoriteWorklog favorite) {
+        FavoriteWorklog updated = favoritesService.updateFavorite(id, favorite);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/api/favorites/worklogs/{id}")
+    public ResponseEntity<Void> deleteFavoriteWorklog(@PathVariable String id) {
+        favoritesService.deleteFavorite(id);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/api/worklogs/list")
