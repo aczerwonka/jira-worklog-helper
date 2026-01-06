@@ -1,5 +1,12 @@
-# Data files (user data should not be committed)
-data/*.csv
+# Ignore .env with secrets
+.env
 
-# Docker volumes
-docker/postgres_data/
+# Ignore frontend build in backend static (optional)
+/backend/src/main/resources/static/
+
+# Maven target
+/backend/target/
+
+# Node modules
+frontend/frontend/node_modules/
+

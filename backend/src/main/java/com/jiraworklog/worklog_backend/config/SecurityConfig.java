@@ -59,15 +59,18 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/**").authenticated()
-                .anyRequest().permitAll()
-            )
-            .httpBasic(basic -> {})
-            .formLogin(form -> form.disable())
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            );
-
-        return http.build();
-    }
-}
+                // allow static PWA and frontend assets
+                .requestMatchers(
+                    "/",
+                    "/index.html",
+                    "/favicon.ico",
+                    "/manifest.webmanifest",
+                    "/sw.js",
+                    "/assets/**",
+                    "/static/**",
+                    "/browser/**",
+                    "/browser/index.html",
+                    "/*.js",
+                    "/*.css"
+                ).permitAll()
+                // API requires authentication

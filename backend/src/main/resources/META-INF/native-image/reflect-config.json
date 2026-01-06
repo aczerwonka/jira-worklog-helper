@@ -1,0 +1,15 @@
+[
+  {
+    "name": "com.jiraworklog.worklog_backend.controller.TestApiController",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.jiraworklog.worklog_backend.controller.SpaForwardController",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  }
+]
+
