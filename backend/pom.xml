@@ -97,4 +97,60 @@
 		</plugins>
 	</build>
 
-</project>
+	<!-- Optional profile to begin GraalVM native image work. Activate with -Pnative. -->
+	<profiles>
+		<profile>
+			<id>native</id>
+			<activation>
+				<activeByDefault>false</activeByDefault>
+			</activation>
+			<build>
+				<plugins>
+					<!-- GraalVM Native Build Tools plugin (integrates native-image) -->
+					<plugin>
+						<groupId>org.graalvm.buildtools</groupId>
+						<artifactId>native-maven-plugin</artifactId>
+						<version>0.9.20</version>
+						<configuration>
+							<!-- Customization: set the output binary name -->
+							<imageName>worklog-native</imageName>
+							<verbose>true</verbose>
+							<!-- Note: Additional resource/reflect config may be required for Spring apps -->
+						</configuration>
+						<executions>
+							<execution>
+								<goals>
+									<goal>native-image</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+
+					<!-- Optional: Spring AOT plugin could be added here if you decide to use Spring AOT generation -->
+					<!--
+					<plugin>
+						<groupId>org.springframework.experimental</groupId>
+						<artifactId>spring-aot-maven-plugin</artifactId>
+						<version>0.14.0</version>
+						<executions>
+							<execution>
+								<goals>
+									<goal>generate</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+					-->
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
+	<!-- Ensure plugin resolver can use Maven Central if needed -->
+	<pluginRepositories>
+		<pluginRepository>
+			<id>central</id>
+			<url>https://repo.maven.apache.org/maven2</url>
+		</pluginRepository>
+	</pluginRepositories>
+
