@@ -7,10 +7,12 @@ $border-light: #e2e8f0;
 $shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 $shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.05);
 $transition: all 150ms ease-in-out;
+
 * {
   margin: 0;
   padding: 0;
-  box-sizing: border-box
+  box-sizing: border-box;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 body, html {
@@ -38,17 +40,47 @@ body, html {
   z-index: 100
 }
 
+.calendar-controls {
+  font-size: 15px;
+  .mode-btn {
+    font-size: 16px;
+    padding: 8px;
+  }
+}
+
+.calendar-nav {
+  padding: 10px;
+  .nav-btn {
+    padding: 8px;
+    font-size: 12px;
+  }
+  .period-label {
+    font-size: 20px;
+    margin: 0 12px;
+  }
+}
+
+.calendar-header h2 {
+  font-size: 30px;
+  color: red;
+}
+
 .navbar .navbar-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
   height: 100%;
   padding: 0 24px;
-  max-width: 1400px;
+  //max-width: 1400px;
   margin: 0 auto;
-  width: 100%
+  width: 100%;
 }
-
+.navbar-user {
+  display: flex;
+  align-items: center;
+  justify-content: right;
+  gap: 12px
+}
 .navbar .navbar-brand h1 {
   font-size: 20px;
   font-weight: 600;
@@ -59,7 +91,7 @@ body, html {
 .navbar .navbar-user .username {
   font-size: 14px;
   color: $text-secondary;
-  font-weight: 500
+  font-weight: 500;
 }
 
 .workspace {
@@ -88,9 +120,10 @@ body, html {
 }
 
 .left-column h2 {
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 600;
-  color: $text-primary
+  color: $text-primary;
+  padding: 5px;
 }
 
 .left-column .badge {
@@ -107,10 +140,10 @@ body, html {
 
 .history-container {
   display: grid;
-  grid-template-columns:repeat(4, 1fr);
-  gap: 12px;
+  grid-template-columns:repeat(6, 1fr);
+  gap: 8px;
   flex: 0 0 auto;
-  max-height: 350px;
+  max-height: 250px;
   overflow-y: auto
 }
 
@@ -118,13 +151,13 @@ body, html {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px;
+  padding: 5px;
   background-color: $bg-card;
   border: 1px solid $border-light;
   border-radius: 8px;
   transition: $transition;
   cursor: pointer;
-  min-height: 90px
+  min-height: 80px
 }
 
 .history-item:hover {
@@ -139,8 +172,8 @@ body, html {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 40px;
-  background: linear-gradient(135deg, $primary-blue 0%, #1e40af 100%);
+  height: 30px;
+  background: linear-gradient(135deg, $primary-blue 0%, #1e40af 40%);
   border-radius: 6px
 }
 
@@ -316,13 +349,40 @@ body, html {
 }
 
 .summary-preview {
+  position: relative;
+  min-height: 36px; /* reserve a small fixed height so summary or loader doesn't change layout */
+  padding: 6px 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: block;
+}
+
+.summary-preview .summary-text {
+  font-size: 15px;
+  color: #3b82f6;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.summary-preview .loading-text {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 12px;
-  color: $primary-blue;
-  margin-top: 6px;
-  padding: 8px;
-  background-color: #f0f9ff;
-  border-radius: 4px;
-  border-left: 2px solid $primary-blue
+  color: #64748b;
+  transition: opacity 160ms ease-in-out, visibility 160ms;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.summary-preview .loading-text.visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 .tag-cloud {
@@ -366,11 +426,19 @@ body, html {
 
 .tag-chip {
   padding: 6px 12px;
-  background-color: #f0f9ff;
-  color: $primary-blue;
-  border: 1px solid #bfdbfe;
+  background-color: #f3f4f6; /* light gray */
+  color: #475569; /* slate-600 */
+  border: 1px solid #e6e9ee;
   border-radius: 16px;
-  font-size: 12px
+  font-size: 12px;
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.tag-chip.active {
+  background-color: #10b981; /* green-500 */
+  color: #ffffff;
+  border-color: rgba(16,185,129,0.2);
+  box-shadow: 0 6px 18px rgba(16,185,129,0.12);
 }
 
 .duration-grid {
@@ -472,14 +540,44 @@ body, html {
 }
 
 .worklog-badge {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  /* use grid so ticket and time sit on the same top row, comment spans full width on second row */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 6px 8px;
   padding: 6px 8px;
   background: #f8fafc;
   border-radius: 6px;
   border: 1px solid $border-light;
-  font-size: 12px
+  font-size: 12px;
+}
+
+.worklog-badge .badge-ticket {
+  grid-column: 1 / 2;
+  grid-row: 1;
+  font-weight: 700;
+  color: $primary-blue;
+  font-size: 12px;
+  align-self: center;
+}
+
+.worklog-badge .badge-time {
+  grid-column: 2 / 3;
+  grid-row: 1;
+  justify-self: end;
+  color: $text-secondary;
+  font-size: 12px;
+  align-self: center;
+}
+
+.worklog-badge .badge-comment {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  color: $text-secondary;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .week-view {
@@ -509,13 +607,42 @@ body, html {
 }
 
 .week-worklog-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  /* Use grid so ticket and time are on the top row, summary/comment spans full width on second row */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 6px 8px;
   padding: 6px 8px;
   background: #fff;
   border-radius: 6px;
-  border: 1px solid $border-light
+  border: 1px solid $border-light;
+  align-items: center;
+}
+
+.week-worklog-item .work-ticket {
+  grid-column: 1 / 2;
+  grid-row: 1;
+  font-weight: 700;
+  color: $primary-blue;
+  font-size: 13px;
+}
+
+.week-worklog-item .work-time {
+  grid-column: 2 / 3;
+  grid-row: 1;
+  justify-self: end;
+  color: $text-secondary;
+  font-size: 12px;
+}
+
+.week-worklog-item .work-comment {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  color: $text-secondary;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .day-view {
@@ -531,7 +658,7 @@ body, html {
   flex-direction: column;
   gap: 6px;
   padding: 8px 0;
-  border-bottom: 1px solid $border-light
+  border-bottom: 1px solid $border-light;
 }
 
 .entry-ticket {
@@ -557,4 +684,225 @@ body, html {
   background-color: rgba(30, 41, 59, 0.03)
 }
 
+/* Prefix badges above textarea */
+.active-prefixes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
 
+.prefix-badge {
+  background: rgba(59,130,246,0.08);
+  color: $primary-blue;
+  padding: 6px 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.prefix-badge.removed {
+  opacity: 0.55;
+  color: darken($text-secondary, 5%);
+  background: rgba(100,116,139,0.06);
+  text-decoration: line-through;
+}
+
+.prefix-remove {
+  background: transparent;
+  border: none;
+  color: $primary-blue;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 4px;
+  label {
+    padding: 5px;
+    font-weight: bolder;
+  }
+}
+
+/* Modal styles (large centered popup) */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 120;
+}
+
+.modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 85vw;
+  max-width: 1100px;
+  height: 75vh;
+  background: $bg-card;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(2,6,23,0.35);
+  z-index: 130;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(2,6,23,0.06);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid $border-light;
+  background: linear-gradient(90deg, rgba(59,130,246,0.04), transparent);
+  button {
+    font-size: 20px;
+    color: whitesmoke;
+    padding: 6px;
+    background-color: #3b82f6;
+  }
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: $text-primary;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: $text-secondary;
+  font-size: 14px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 18px 20px;
+  overflow: auto;
+  display: block;
+}
+.prefixes-table {
+  td {
+    padding: 5px;
+    font-size: 20px;
+    input {
+      font-size: 18px;
+    }
+    button {
+      font-size: 16px;
+      padding: 10px;
+      color: #1e40af;
+    }
+  }
+  input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+  }
+}
+/* Buttons */
+.btn-prefixes,
+.btn-primary,
+button.duration-btn,
+.tag-chip {
+  background: $primary-blue;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.btn-prefixes:hover,
+.btn-primary:hover,
+button.duration-btn:hover,
+.tag-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59,130,246,0.15);
+}
+
+.btn-primary[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Prefixes table */
+.prefixes-table table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.prefixes-table thead th {
+  text-align: left;
+  font-size: 13px;
+  padding: 8px 10px;
+  color: $text-secondary;
+  border-bottom: 1px solid $border-light;
+}
+
+.prefixes-table tbody td {
+  padding: 10px;
+  border-bottom: 1px solid rgba(226,232,240,0.6);
+  vertical-align: middle;
+}
+
+.prefixes-table tbody tr:hover {
+  background: rgba(59,130,246,0.03);
+}
+
+.prefixes-table input[type="text"],
+.prefixes-table input[type="checkbox"] {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid $border-light;
+}
+
+/* Make modal controls nicer */
+.modal-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 20px;
+  label {
+    font-size: 25px;
+  }
+  input {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+    padding: 5px;
+  }
+  button {
+    font-size: 20px;
+    padding: 5px;
+    color: #1e40af;
+  }
+}
+
+.modal-controls label {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+  color: $text-primary;
+}
+
+/* Responsive tweaks */
+@media (max-width: 900px) {
+  .modal {
+    width: 95vw;
+    height: 85vh;
+    border-radius: 8px;
+  }
+  .left-column { padding: 18px }
+  .right-column { padding: 12px }
+}

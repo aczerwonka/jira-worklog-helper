@@ -7,7 +7,18 @@
         <h1>Worklog Tracker</h1>
       </div>
       <div class="navbar-user">
-        <span class="username">admin</span>
+        <button type="button" class="btn-prefixes" (click)="openPrefixesModal()">PREFIXES</button>
+        <button
+          type="button"
+          (click)="togglePrefixesEnabled()"
+          [attr.aria-pressed]="prefixesEnabled()"
+          style="margin-left:12px;padding:6px 10px;border-radius:6px;border:none;cursor:pointer;color:#fff;font-weight:600;font-size:14px"
+          [style.background]="prefixesEnabled() ? '#10B981' : '#6B7280'"
+          [title]="prefixesEnabled() ? 'Prefixes enabled' : 'Prefixes disabled'"
+        >
+          <span *ngIf="prefixesEnabled()">Prefixes: ON</span>
+          <span *ngIf="!prefixesEnabled()">Prefixes: OFF</span>
+        </button>
       </div>
     </div>
   </nav>
@@ -75,16 +86,20 @@
             <div class="days-grid">
               <div *ngFor="let dayObj of calendarDays()" class="day-cell"
                    (click)="selectCalendarDate(dayObj.date)"
-                   [class.other-month]="dayObj.date.getMonth() !== currentDate().getMonth()">
+                   [class.other-month]="dayObj.date.getMonth() !== currentDate().getMonth()"
+                   [style.backgroundColor]="isFormDate(dayObj.date) ? 'rgba(59,130,246,0.08)' : null"
+                   [style.border]="isFormDate(dayObj.date) ? '1px solid rgba(59,130,246,0.35)' : null"
+                   [style.borderRadius]="isFormDate(dayObj.date) ? '6px' : null">
                 <div class="day-number">{{ dayObj.date.getDate() }}</div>
                 <!--worklogs badges-->
                 <div class="day-total-badge" *ngIf="sumWorkTime(dayObj.worklogs)">
                   <span class="badge total-time">{{ sumWorkTime(dayObj.worklogs) }}</span>
                 </div>
                 <div class="day-worklogs" *ngIf="dayObj.worklogs && dayObj.worklogs.length > 0">
-                  <div class="worklog-badge" *ngFor="let worklog of dayObj.worklogs">
+                  <div class="worklog-badge" *ngFor="let worklog of dayObj.worklogs" (click)="fillFormFromWorklog(worklog); $event.stopPropagation()">
                     <span class="badge-ticket">{{ displayTicket(worklog) }}</span>
                     <span class="badge-time">{{ displayWorkTime(worklog) }}</span>
+                    <div class="badge-comment" *ngIf="worklog.comment">{{ worklog.comment }}</div>
                   </div>
                 </div>
               </div>
@@ -104,16 +119,20 @@
               </div>
               <div class="week-days">
                 <div *ngFor="let dayObj of getWeekDays()" class="week-day-card"
-                   (click)="selectCalendarDate(dayObj.date)">
+                   (click)="selectCalendarDate(dayObj.date)"
+                   [style.backgroundColor]="isFormDate(dayObj.date) ? 'rgba(59,130,246,0.08)' : null"
+                   [style.border]="isFormDate(dayObj.date) ? '1px solid rgba(59,130,246,0.35)' : null"
+                   [style.borderRadius]="isFormDate(dayObj.date) ? '6px' : null">
                 <div class="week-day-header">
                   <div class="day-name">{{ dayObj.date | date:'EEE':'' :'en-US' }}</div>
                   <div class="day-date">{{ dayObj.date | date:'MMM d':'' :'en-US' }}</div>
                 </div>
                  <div class="week-day-worklogs">
                   <div *ngIf="dayObj.worklogs && dayObj.worklogs.length > 0; else emptyDay">
-                    <div class="week-worklog-item" *ngFor="let worklog of dayObj.worklogs">
+                    <div class="week-worklog-item" *ngFor="let worklog of dayObj.worklogs" (click)="fillFormFromWorklog(worklog); $event.stopPropagation()">
                       <span class="work-ticket">{{ displayTicket(worklog) }}</span>
                       <span class="work-time">{{ displayWorkTime(worklog) }}</span>
+                      <div class="work-comment" *ngIf="worklog.comment">{{ worklog.comment }}</div>
                     </div>
                   </div>
                   <ng-template #emptyDay>
@@ -132,10 +151,10 @@
               </div>
               <div class="day-worklogs-list">
                 <div *ngIf="calendarDays()[0].worklogs && calendarDays()[0].worklogs.length > 0; else noDayWorklogs">
-                  <div class="day-worklog-entry" *ngFor="let worklog of calendarDays()[0].worklogs">
+                  <div class="day-worklog-entry" *ngFor="let worklog of calendarDays()[0].worklogs" (click)="fillFormFromWorklog(worklog); $event.stopPropagation()">
                     <div class="entry-ticket">{{ displayTicket(worklog) }}</div>
-                    <div class="entry-summary">{{ displaySummary(worklog) }}</div>
                     <div class="entry-time">{{ displayWorkTime(worklog) }}</div>
+                    <div class="entry-summary">{{ displaySummary(worklog) }}</div>
                   </div>
                 </div>
                 <ng-template #noDayWorklogs>
@@ -164,6 +183,9 @@
 
     <!-- Right Column: Action Panel (Form) -->
     <div class="right-column">
+      <!-- New Favorites Component -->
+      <app-favorites (favoriteSelected)="selectFavoriteWorklog($event)"></app-favorites>
+
       <div class="action-panel">
         <div class="panel-header">
           <h2>Log Work</h2>
@@ -172,7 +194,6 @@
         <form [formGroup]="worklogForm" class="worklog-form">
           <!-- Favorites Section -->
           <div class="form-section">
-            <label class="section-label">Favorite Tickets</label>
             <div class="favorites-grid" *ngIf="favorites().length > 0">
               <button
                 type="button"
@@ -196,41 +217,62 @@
               formControlName="ticketKey"
               placeholder="e.g., DUM-123"
               (change)="onTicketKeyChange($any($event.target).value)"
+              (input)="onTicketKeyInput($any($event.target).value)"
               class="form-input"
             />
-            <div *ngIf="isLoadingSummary()" class="loading-text">Loading...</div>
-            <div *ngIf="selectedTicketSummary()" class="summary-preview">
-              {{ selectedTicketSummary() }}
+            <!-- always render placeholder to avoid layout jump; loader is absolutely positioned inside it -->
+            <div class="summary-preview">
+              <div class="loading-text" [class.visible]="isLoadingSummary()">Loading...</div>
+              <div class="summary-text">{{ selectedTicketSummary() }}</div>
             </div>
           </div>
 
           <!-- Activity Description -->
           <div class="form-section">
-            <label for="comment" class="form-label">Activity Description</label>
+            <label for="comment" class="form-label">Worklog comment</label>
+            <!-- Active prefixes badges -->
+            <div class="active-prefixes" *ngIf="activePrefixes().length > 0">
+              <span
+                class="prefix-badge"
+                *ngFor="let p of activePrefixes()"
+                [class.removed]="removedPrefixes().includes(p)"
+              >
+                [{{ p }}]
+                <button
+                  type="button"
+                  class="prefix-remove"
+                  (click)="removeActivePrefix(p)"
+                >
+                  <label>X</label>
+                </button>
+              </span>
+            </div>
             <textarea
               id="comment"
               formControlName="comment"
               placeholder="Describe what you worked on..."
               class="form-textarea"
               (focus)="fetchSuggestedPrefixes()"
+              (input)="onCommentInput($any($event.target).value)"
             ></textarea>
           </div>
 
-          <!-- Suggested Prefixes -->
-          <div class="form-section" *ngIf="suggestedPrefixes().length > 0">
-            <label class="section-label">Suggested Tags</label>
-            <div class="tag-cloud">
-              <button
-                type="button"
-                *ngFor="let prefix of suggestedPrefixes()"
-                (click)="addPrefixToComment(prefix)"
-                class="tag-chip"
-              >
-                {{ prefix }}
-              </button>
-            </div>
-          </div>
-
+          <!-- Suggested Prefixes START-->
+          <div class="form-section" *ngIf="constantPrefixes().length > 0">
+             <label class="section-label">Standard prefixes</label>
+             <div class="tag-cloud">
+               <button
+                 type="button"
+                 *ngFor="let prefix of constantPrefixes()"
+                 (click)="toggleConstantPrefix(prefix)"
+                 [class.active]="selectedConstantPrefixes().includes(prefix)"
+                 class="tag-chip"
+               >
+                 {{ prefix }}
+               </button>
+             </div>
+           </div>
+          <!-- Suggested Prefixes END-->
           <!-- Date Picker -->
           <div class="form-section">
             <label for="date" class="form-label">Date</label>
@@ -301,6 +343,65 @@
           </button>
         </form>
       </div>
+
+      <div style="margin-top:50px">
+        <span>
+        Add google calendar integration here
+        </span>
+        <br/>
+        <span>
+        Add gitlab history integration here
+        </span>
+      </div>
     </div>
+  </div>
+
+  <!-- Toast container (right-bottom) -->
+  <div id="toast-container" aria-live="polite" style="position:fixed;right:16px;bottom:16px;z-index:110;display:flex;flex-direction:column;gap:8px;align-items:flex-end;"></div>
+
+  <!-- simple prefixes modal -->
+  <div class="modal-backdrop" *ngIf="showPrefixesModal()" (click)="closePrefixesModal()"></div>
+  <div class="modal" *ngIf="showPrefixesModal()">
+    <div class="modal-header">
+      <h3>Manage Prefixes</h3>
+      <button type="button" class="modal-close" (click)="closePrefixesModal()">Close</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-controls">
+        <label><input type="checkbox" [checked]="prefixesEnabled()" (change)="togglePrefixesEnabled()" /> Prefixes enabled</label>
+        <button type="button" (click)="startAddPrefix()">Add prefix</button>
+      </div>
+
+      <div class="prefixes-table">
+        <table>
+          <thead><tr><th>Type (keyword)</th><th>Prefix</th><th>Enabled</th><th>Actions</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let p of prefixesList()">
+              <td *ngIf="editingPrefix?.id !== p.id">{{p.type}}</td>
+              <td *ngIf="editingPrefix?.id === p.id"><input [(ngModel)]="editingPrefix.type"/></td>
+              <td *ngIf="editingPrefix?.id !== p.id">{{p.prefix}}</td>
+              <td *ngIf="editingPrefix?.id === p.id"><input [(ngModel)]="editingPrefix.prefix"/></td>
+              <td *ngIf="editingPrefix?.id !== p.id">{{p.enabled}}</td>
+              <td *ngIf="editingPrefix?.id === p.id"><input type="checkbox" [(ngModel)]="editingPrefix.enabled"/></td>
+              <td>
+                <button *ngIf="editingPrefix?.id !== p.id" type="button" (click)="editPrefix(p)">Edit</button>
+                <button *ngIf="editingPrefix?.id === p.id" type="button" (click)="saveEditingPrefix()">Save</button>
+                <button type="button" (click)="deletePrefix(p)">Delete</button>
+                <button *ngIf="editingPrefix?.id === p.id" type="button" (click)="cancelEditing()">Cancel</button>
+              </td>
+            </tr>
+            <tr *ngIf="addingPrefix">
+              <td><input [(ngModel)]="newPrefix.type"/></td>
+              <td><input [(ngModel)]="newPrefix.prefix"/></td>
+              <td><input type="checkbox" [(ngModel)]="newPrefix.enabled"/></td>
+              <td>
+                <button type="button" (click)="createPrefix()">Create</button>
+                <button type="button" (click)="cancelAdd()">Cancel</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+     </div>
   </div>
 </div>

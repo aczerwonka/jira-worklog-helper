@@ -3,12 +3,14 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { CommonModule } from '@angular/common';
 import { HttpClientModule } from '@angular/common/http';
 import { WorklogService } from './services/worklog.service';
-import { Worklog, FavoriteTicket, WorklogHistoryItem, JiraIssueSummary, WorklogEntry } from './models/worklog.model';
+import { Worklog, FavoriteTicket, FavoriteWorklog, WorklogHistoryItem, JiraIssueSummary, WorklogEntry } from './models/worklog.model';
+import { FavoritesComponent } from './favorites/favorites.component';
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, HttpClientModule],
+  imports: [CommonModule, ReactiveFormsModule, HttpClientModule, FormsModule, FavoritesComponent],
   templateUrl: './app.html',
   styleUrls: ['./app.scss'],
   providers: [WorklogService],
@@ -20,6 +22,21 @@ export class App implements OnInit {
   favorites = signal<FavoriteTicket[]>([]);
   history = signal<WorklogHistoryItem[]>([]);
   suggestedPrefixes = signal<string[]>([]);
+  // constant prefixes loaded from constant_prefixes.csv via backend
+  constantPrefixes = signal<string[]>([]);
+  // auto-deduced prefixes (from mappings/suggestions) — kept separate from manual constant prefixes
+  autoPrefixes = signal<string[]>([]);
+  // pełna lista prefixów (konfigurowalna, modal)
+  prefixesList = signal<any[]>([]);
+  prefixesEnabled = signal<boolean>(true);
+  // aktywne prefixy na podstawie komentarza (auto) – tylko na bieżący formularz
+  activePrefixes = signal<string[]>([]);
+  // wyłączone (soft-delete) auto-prefixy dla aktualnego formularza – pomijane przy POST
+  removedPrefixes = signal<string[]>([]);
+  // stałe prefixy wybrane ręcznie (z constantPrefixes) – trwają pomiędzy POSTami
+  selectedConstantPrefixes = signal<string[]>([]);
+  // widoczność modala PREFIXES
+  showPrefixesModal = signal<boolean>(false);
   issueSummary = signal<JiraIssueSummary | null>(null);
   isLoadingSave = signal(false);
   isLoadingSummary = signal(false);
@@ -44,6 +61,9 @@ export class App implements OnInit {
   // legacy/template compatibility: some templates may still reference durationOptions
   durationOptions: number[] = []; // kept empty to avoid rendering legacy single-list UI
 
+  private ticketInputDebounce: any = null;
+  private commentInputDebounce: any = null;
+
   constructor(
     private fb: FormBuilder,
     private worklogService: WorklogService
@@ -67,6 +87,14 @@ export class App implements OnInit {
     this.buildCalendar();
     // load full range for calendar
     this.loadCalendarWorklogsForCurrentView();
+    this.loadConstantPrefixes();
+  }
+
+  loadConstantPrefixes(): void {
+    this.worklogService.getConstantPrefixes().subscribe({
+      next: (data) => this.constantPrefixes.set(data || []),
+      error: (err) => { console.error('Failed to load constant prefixes', err); this.constantPrefixes.set([]); }
+    });
   }
 
   // Load worklogs for the currently visible calendar range
@@ -153,6 +181,26 @@ export class App implements OnInit {
     this.fetchIssueSummary(ticket.key);
   }
 
+  selectFavoriteWorklog(favorite: FavoriteWorklog): void {
+    // Set ticket key
+    this.worklogForm.patchValue({ ticketKey: favorite.ticketKey });
+    this.selectedTicket.set(favorite.ticketKey);
+    this.fetchIssueSummary(favorite.ticketKey);
+
+    // Set comment
+    this.worklogForm.patchValue({ comment: favorite.comment });
+
+    // Set time (convert minutes to seconds)
+    const timeInSeconds = favorite.defaultTimeMinutes * 60;
+    this.worklogForm.patchValue({ timeSpentSeconds: timeInSeconds });
+
+    // Update hour/minute signals
+    const hours = Math.floor(favorite.defaultTimeMinutes / 60);
+    const minutes = favorite.defaultTimeMinutes % 60;
+    this.selectedHours.set(hours);
+    this.selectedMinutes.set(minutes);
+  }
+
   selectHistoryItem(item: WorklogHistoryItem): void {
     this.worklogForm.patchValue({ ticketKey: item.ticketKey });
     this.selectedTicket.set(item.ticketKey);
@@ -186,71 +234,147 @@ export class App implements OnInit {
     const ticketKey = this.worklogForm.get('ticketKey')?.value;
     const comment = this.worklogForm.get('comment')?.value;
 
-    if (ticketKey) {
-      this.worklogService.getSuggestedPrefixes({ ticketKey, baseComment: comment }).subscribe({
-        next: (response) => this.suggestedPrefixes.set(response.prefixes),
-        error: (err) => console.error('Error fetching suggestions', err),
-      });
+    // Trigger suggestion request even if ticketKey is empty — allow suggestions based on comment alone
+    // Require at least some input (comment or ticketKey) to avoid empty requests
+    const hasComment = typeof comment === 'string' && comment.trim().length > 0;
+    const hasTicketKey = typeof ticketKey === 'string' && ticketKey.trim().length > 0;
+    if (!hasComment && !hasTicketKey) return;
+
+    this.worklogService.getSuggestedPrefixes({ ticketKey, baseComment: comment }).subscribe({
+      next: (response) => this.suggestedPrefixes.set(response.prefixes),
+      error: (err) => console.error('Error fetching suggestions', err),
+    });
+  }
+
+  // add suggested prefix as active badge (dedupe)
+  addPrefixToComment(prefix: string): void {
+    if (!prefix) return;
+    const list = this.activePrefixes();
+    const removed = this.removedPrefixes();
+    // jeżeli już jest aktywny, nic nie rób (auto-prefixy są tylko z jednego źródła)
+    if (list.includes(prefix)) {
+      return;
+    }
+    // jeżeli był oznaczony jako usunięty, zdejmij go z removed
+    if (removed.includes(prefix)) {
+      this.removedPrefixes.set(removed.filter(p => p !== prefix));
+    }
+    this.activePrefixes.set([...list, prefix]);
+  }
+
+  addActivePrefix(prefix: string): void {
+    this.addPrefixToComment(prefix);
+  }
+
+  // Toggle constant prefix active state (for tags from constant_prefixes.csv)
+  toggleConstantPrefix(prefix: string): void {
+    if (!prefix) return;
+    const selected = this.selectedConstantPrefixes();
+    // jeśli już zaznaczony – wyłącz (usuń z listy wybranych)
+    if (selected.includes(prefix)) {
+      this.selectedConstantPrefixes.set(selected.filter(p => p !== prefix));
+      return;
+    }
+    // jeśli nie zaznaczony – dodaj jako „na stałe” aktywny
+    this.selectedConstantPrefixes.set([...selected, prefix]);
+  }
+
+  // soft toggle: mark prefix as removed (soft-delete) so it won't be included when saving; clicking again restores it
+  removeActivePrefix(prefix: string): void {
+    const removed = this.removedPrefixes();
+    if (removed.includes(prefix)) {
+      // restore
+      this.removedPrefixes.set(removed.filter(p => p !== prefix));
+    } else {
+      // mark removed
+      this.removedPrefixes.set([...removed, prefix]);
     }
   }
 
-  addPrefixToComment(prefix: string): void {
-    const commentControl = this.worklogForm.get('comment');
-    const currentValue = commentControl?.value || '';
-    const newValue = currentValue ? `${currentValue} ${prefix}` : prefix;
-    commentControl?.setValue(newValue);
+  // debounced handler for manual typing
+  onTicketKeyInput(value: string): void {
+    if (this.ticketInputDebounce) clearTimeout(this.ticketInputDebounce);
+    this.ticketInputDebounce = setTimeout(() => {
+      if (value && value.length > 2) {
+        this.worklogService.getSuggestedPrefixes({ ticketKey: value, baseComment: this.worklogForm.get('comment')?.value }).subscribe({
+          next: (response) => {
+            const prefixes = response.prefixes || [];
+            // lista sugerowanych prefixów z backendu (np. do przyszłego UI)
+            this.suggestedPrefixes.set(prefixes);
+            // zawsze zapisujemy auto-prefixy (pełne sugestie)
+            this.autoPrefixes.set(prefixes);
+            // aktywne auto-prefixy: zachowaj soft-usunięte (removedPrefixes) aby były widoczne jako nieaktywne
+            const removed = this.removedPrefixes() || [];
+            const union = Array.from(new Set([...prefixes, ...removed]));
+            this.activePrefixes.set(union);
+          },
+          error: (err) => console.error('Error fetching suggestions', err),
+        });
+        this.fetchIssueSummary(value);
+      }
+    }, 300);
   }
 
-  setDuration(minutes: number): void {
-    // kept for backward compatibility but prefer setHours/setMinutes
-    const hrs = this.selectedHours();
-    const mins = minutes;
-    this.selectedMinutes.set(mins);
-    this.worklogForm.patchValue({ timeSpentSeconds: hrs * 3600 + mins * 60 });
+  // debounced handler for typing in Activity Description textarea
+  onCommentInput(value: string): void {
+    if (this.commentInputDebounce) clearTimeout(this.commentInputDebounce);
+    this.commentInputDebounce = setTimeout(() => {
+      try {
+        if (!this.prefixesEnabled()) return; // prefixes disabled
+        const ticketKey = this.worklogForm.get('ticketKey')?.value;
+        const baseComment = value || '';
+        // only query suggestions when we have either ticketKey or some comment text
+        const hasComment = typeof baseComment === 'string' && baseComment.trim().length > 0;
+        const hasTicketKey = typeof ticketKey === 'string' && ticketKey.trim().length > 0;
+        if (!hasComment && !hasTicketKey) return;
+        this.worklogService.getSuggestedPrefixes({ ticketKey, baseComment }).subscribe({
+          next: (resp) => {
+            const prefixes = resp.prefixes || [];
+            this.suggestedPrefixes.set(prefixes);
+            // auto-prefixy wyznaczone na podstawie komentarza
+            this.autoPrefixes.set(prefixes);
+            // przy aktualizacji sugestii: zachowaj soft-usunięte prefixy tak, żeby były widoczne jako nieaktywne
+            const removed = this.removedPrefixes() || [];
+            const union = Array.from(new Set([...prefixes, ...removed]));
+            this.activePrefixes.set(union);
+          },
+             error: (err) => { /* silent */ console.error('Error fetching suggestions from comment input', err); }
+          });
+       } catch (e) {
+         // ignore
+       }
+    }, 100);
   }
 
-  setHours(h: number): void {
-    this.selectedHours.set(h);
-    const mins = this.selectedMinutes();
-    this.worklogForm.patchValue({ timeSpentSeconds: h * 3600 + mins * 60 });
+  closePrefixesModal(): void {
+    this.showPrefixesModal.set(false);
   }
-
-  setMinutes(m: number): void {
-    this.selectedMinutes.set(m);
-    const hrs = this.selectedHours();
-    this.worklogForm.patchValue({ timeSpentSeconds: hrs * 3600 + m * 60 });
-  }
-
-  // --- Added compatibility wrappers used by the template ---
-  setSelectedHour(hour: number): void {
-    this.setHours(hour);
-  }
-
-  getSelectedHour(): number {
-    return this.selectedHours();
-  }
-
-  setSelectedMinute(minute: number): void {
-    this.setMinutes(minute);
-  }
-
-  getSelectedMinute(): number {
-    return this.selectedMinutes();
-  }
-  // --- end wrappers ---
 
   saveWorklog(): void {
     if (this.worklogForm.invalid) {
-      alert('Please fill in all required fields');
+      // alert('Please fill in all required fields');
+      this.showToast('Please fill in all required fields');
       return;
     }
 
     this.isLoadingSave.set(true);
     // Build explicit payload to ensure `date` is included and correctly formatted
     const form = this.worklogForm.value;
+    // auto-prefixy (z komentarza) po odfiltrowaniu soft-deleted
+    const active = this.activePrefixes() || [];
+    const removed = this.removedPrefixes() || [];
+    const autos = active.filter(p => !removed.includes(p));
+    // stałe prefixy wybrane na stałe (nie resetujemy między POST)
+    const manual = this.selectedConstantPrefixes() || [];
+    const seen = new Set<string>();
+    const combined: string[] = [];
+    for (const p of manual) { if (p && !seen.has(p)) { seen.add(p); combined.push(p); } }
+    for (const p of autos) { if (p && !seen.has(p)) { seen.add(p); combined.push(p); } }
+    const prefixString = combined.map(p => `[${p}]`).join('');
+    const finalComment = `${prefixString}${prefixString ? ' ' : ''}${(form.comment || '').trim()}`.trim();
     const payload: Worklog = {
       ticketKey: form.ticketKey,
-      comment: form.comment,
+      comment: finalComment,
       timeSpentSeconds: form.timeSpentSeconds,
       date: form.date,
       started: this.makeStartedTimestamp(form.date)
@@ -259,20 +383,99 @@ export class App implements OnInit {
 
     this.worklogService.createWorklog(payload).subscribe({
       next: (response) => {
-        alert('Worklog created successfully');
+        // alert('Worklog created successfully');
+        this.showToast('Worklog created successfully');
+        // preserve date and duration selected in the form (do not clear chosen date/time)
+        const currentDateVal = this.worklogForm.get('date')?.value;
+        const preservedHours = this.selectedHours();
+        const preservedMinutes = this.selectedMinutes();
         this.worklogForm.reset();
+        if (currentDateVal) {
+          this.worklogForm.patchValue({ date: currentDateVal });
+        }
+        // restore duration signals and form seconds
+        this.selectedHours.set(preservedHours ?? 0);
+        this.selectedMinutes.set(preservedMinutes ?? 0);
+        const restoredSeconds = (preservedHours ?? 0) * 3600 + (preservedMinutes ?? 0) * 60;
+        this.worklogForm.patchValue({ timeSpentSeconds: restoredSeconds });
         this.selectedTicket.set('');
         this.selectedTicketSummary.set('');
         this.suggestedPrefixes.set([]);
-        this.issueSummary.set(null);
-        this.loadHistory();
+        // po POST resetujemy auto-prefixy i ich soft-delete; stałe prefixy zostają
+        this.activePrefixes.set([]);
+        this.autoPrefixes.set([]);
+        this.removedPrefixes.set([]);
+         this.issueSummary.set(null);
+         this.loadHistory();
+         // odśwież kalendarz po zapisaniu nowego worklogu
+         this.refreshCalendarAndWorklogs();
       },
       error: (err) => {
         console.error('Error saving worklog', err);
-        alert('Error saving worklog: ' + (err.error?.message || err.message));
+        // alert('Error saving worklog: ' + (err.error?.message || err.message));
+        this.showToast('Error saving worklog: ' + (err.error?.message || err.message));
       },
       complete: () => this.isLoadingSave.set(false),
     });
+  }
+
+  // Simple toast implementation: shows a message in the bottom-right for a short time
+  private toastTimer: any = null;
+  showToast(message: string, timeoutMs: number = 2000): void {
+    try {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      // create toast element
+      const toast = document.createElement('div');
+      toast.textContent = message;
+      toast.setAttribute('role', 'status');
+      toast.style.background = '#111827';
+      toast.style.color = '#fff';
+      toast.style.padding = '10px 14px';
+      toast.style.borderRadius = '8px';
+      toast.style.boxShadow = '0 4px 12px rgba(2,6,23,0.2)';
+      toast.style.maxWidth = '320px';
+      toast.style.fontSize = '13px';
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 160ms ease-in-out, transform 160ms ease-in-out';
+      toast.style.transform = 'translateY(8px)';
+
+      container.appendChild(toast);
+
+      // force reflow to enable transition
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      toast.offsetHeight;
+
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+
+      // remove after timeout
+      const t = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(() => {
+          try { container.removeChild(toast); } catch (e) { /* ignore */ }
+        }, 180);
+      }, timeoutMs);
+
+      // keep reference to allow clearing if needed
+      this.toastTimer = t;
+    } catch (e) {
+      // fallback to alert if DOM not available
+      try { alert(message); } catch (_) { /* no-op */ }
+    }
+  }
+
+  clearToast(): void {
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+      this.toastTimer = null;
+    }
+    const container = document.getElementById('toast-container');
+    if (container) {
+      container.innerHTML = '';
+    }
   }
 
   // Build a started timestamp from YYYY-MM-DD and local timezone offset
@@ -452,6 +655,17 @@ export class App implements OnInit {
     this.worklogForm.patchValue({ date: dateStr });
   }
 
+  // Returns true when given date matches the date currently set in the form (YYYY-MM-DD)
+  isFormDate(date: Date): boolean {
+    try {
+      const formDate = this.worklogForm?.get('date')?.value;
+      if (!formDate) return false;
+      return this.getDateString(date) === formDate;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Template helpers to safely extract fields from union types
   displayTicket(worklog: any): string {
     if (!worklog) return '';
@@ -525,6 +739,47 @@ export class App implements OnInit {
     return totalMinutes;
   }
 
+  // Fill the form from a clicked calendar worklog; do NOT change the date field
+  fillFormFromWorklog(worklog: any): void {
+    if (!worklog) return;
+
+    const ticket = this.displayTicket(worklog);
+    const summary = this.displaySummary(worklog);
+    // Prefer comment/summary fields if present
+    const comment = worklog.comment || summary || '';
+
+    // Determine seconds: prefer numeric timeSpentSeconds, otherwise parse workTime
+    let seconds = 0;
+    if (typeof worklog.timeSpentSeconds === 'number') {
+      seconds = worklog.timeSpentSeconds;
+    } else if (worklog.workTime) {
+      const mins = this.parseWorkTimeToMinutes(worklog.workTime);
+      seconds = mins * 60;
+    }
+
+    // patch form without touching date
+    this.worklogForm.patchValue({
+      ticketKey: ticket,
+      comment: comment,
+      timeSpentSeconds: seconds || this.worklogForm.get('timeSpentSeconds')?.value,
+    });
+
+    // update signals for UI (ticket and summary)
+    if (ticket) {
+      this.selectedTicket.set(ticket);
+      // fetch latest issue summary for this ticket so the form shows up-to-date summary
+      this.fetchIssueSummary(ticket);
+    }
+    if (summary) this.selectedTicketSummary.set(summary);
+
+    // set hour/minute signals based on seconds
+    const totalMinutes = Math.round((seconds || 0) / 60);
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    this.selectedHours.set(hrs);
+    this.selectedMinutes.set(mins);
+  }
+
   // Sumuje pole workTime dla podanej listy worklogów i zwraca sformatowany string, np. "3h 15m" lub "45m"
   sumWorkTime(worklogs: any[] | undefined | null): string {
     if (!worklogs || !Array.isArray(worklogs) || worklogs.length === 0) return '';
@@ -536,4 +791,131 @@ export class App implements OnInit {
     if (totalMinutes <= 0) return '';
     return this.formatMinutesToEnglish(totalMinutes);
   }
+
+  openPrefixesModal(): void {
+    this.showPrefixesModal.set(true);
+    this.loadPrefixesList();
+    this.loadPrefixesEnabled();
+  }
+
+  // prefix management UI state
+  editingPrefix: any = null;
+  addingPrefix: boolean = false;
+  newPrefix: any = { type: '', prefix: '', label: '', enabled: true };
+
+  loadPrefixesList(): void {
+    this.worklogService.getPrefixes().subscribe({
+      next: (data) => this.prefixesList.set(data || []),
+      error: (err) => { console.error('Failed to load prefixes', err); this.prefixesList.set([]); }
+    });
+  }
+
+  loadPrefixesEnabled(): void {
+    this.worklogService.getPrefixesEnabled().subscribe({
+      next: (flag) => this.prefixesEnabled.set(!!flag),
+      error: (err) => { console.error('Failed to load prefixes enabled', err); this.prefixesEnabled.set(true); }
+    });
+  }
+
+  togglePrefixesEnabled(): void {
+    const oldVal = this.prefixesEnabled();
+    const newVal = !oldVal;
+    // optimistic UI update
+    this.prefixesEnabled.set(newVal);
+    this.worklogService.setPrefixesEnabled(newVal).subscribe({
+      next: () => {
+        // server accepted — nothing more to do (UI already updated)
+      },
+      error: (err) => {
+        console.error('Failed to set prefixes enabled', err);
+        // rollback optimistic change
+        this.prefixesEnabled.set(oldVal);
+        this.showToast('Failed to update prefixes enabled: ' + (err.error?.message || err.message));
+      }
+    });
+  }
+
+  startAddPrefix(): void {
+    this.addingPrefix = true;
+    this.newPrefix = { type: '', prefix: '', label: '', enabled: true };
+  }
+
+  cancelAdd(): void {
+    this.addingPrefix = false;
+    this.newPrefix = { type: '', prefix: '', label: '', enabled: true };
+  }
+
+  createPrefix(): void {
+    const payload = { ...this.newPrefix };
+    this.worklogService.createPrefix(payload).subscribe({
+      next: (created) => {
+        this.prefixesList.set([...(this.prefixesList() || []), created]);
+        this.addingPrefix = false;
+      },
+      error: (err) => console.error('Failed to create prefix', err)
+    });
+  }
+
+  editPrefix(p: any): void {
+    // create shallow copy for editing
+    this.editingPrefix = { ...p };
+  }
+
+  cancelEditing(): void {
+    this.editingPrefix = null;
+  }
+
+  saveEditingPrefix(): void {
+    if (!this.editingPrefix || !this.editingPrefix.id) return;
+    this.worklogService.updatePrefix(this.editingPrefix.id, this.editingPrefix).subscribe({
+      next: (updated) => {
+        const list = (this.prefixesList() || []).map((x:any) => x.id === updated.id ? updated : x);
+        this.prefixesList.set(list);
+        this.editingPrefix = null;
+      },
+      error: (err) => console.error('Failed to update prefix', err)
+    });
+  }
+
+  deletePrefix(p: any): void {
+    if (!p || !p.id) return;
+    this.worklogService.deletePrefix(p.id).subscribe({
+      next: () => {
+        this.prefixesList.set((this.prefixesList() || []).filter((x:any) => x.id !== p.id));
+      },
+      error: (err) => console.error('Failed to delete prefix', err)
+    });
+  }
+
+  // set hours and update form seconds
+  setHours(h: number): void {
+    this.selectedHours.set(h);
+    const mins = this.selectedMinutes();
+    this.worklogForm.patchValue({ timeSpentSeconds: h * 3600 + mins * 60 });
+  }
+
+  // set minutes and update form seconds
+  setMinutes(m: number): void {
+    this.selectedMinutes.set(m);
+    const hrs = this.selectedHours();
+    this.worklogForm.patchValue({ timeSpentSeconds: hrs * 3600 + m * 60 });
+  }
+
+  // --- Added compatibility wrappers used by the template ---
+  setSelectedHour(hour: number): void {
+    this.setHours(hour);
+  }
+
+  getSelectedHour(): number {
+    return this.selectedHours();
+  }
+
+  setSelectedMinute(minute: number): void {
+    this.setMinutes(minute);
+  }
+
+  getSelectedMinute(): number {
+    return this.selectedMinutes();
+  }
+  // --- end wrappers ---
 }

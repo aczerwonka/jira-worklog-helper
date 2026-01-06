@@ -188,6 +188,11 @@ public class JiraService {
                                         we.setDate(datePart);
                                         we.setTicketNumber(issue.getKey());
                                         we.setWorkTime(formatSeconds(secs));
+                                        // copy Jira worklog comment/description if available
+                                        Object commentObj = wm.get("comment");
+                                        if (commentObj != null) {
+                                            we.setComment(commentObj.toString());
+                                        }
                                         out.add(we);
                                     }
                                 }

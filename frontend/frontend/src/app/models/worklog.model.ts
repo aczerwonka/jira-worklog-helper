@@ -20,6 +20,7 @@ export interface JiraIssueSummary {
 export interface WorklogHistoryItem {
   ticketKey: string;
   summary: string;
+  comment?: string;
   author?: string;
   timeSpentSeconds?: number;
   started?: string;
@@ -40,6 +41,13 @@ export interface FavoriteTicket {
   label: string;
 }
 
+export interface FavoriteWorklog {
+  id?: string;
+  ticketKey: string;
+  comment: string;
+  defaultTimeMinutes: number;
+}
+
 export interface JiraWorklogResponse {
   id: string;
   author: string;
@@ -49,6 +57,7 @@ export interface JiraWorklogResponse {
 
 export interface WorklogEntry {
   date: string; // YYYY-MM-DD
-  workTime: string; // human readable e.g. "2 hours 30 minutes"
+  workTime: string; // human readable e.g. "2 godz. 30 min"
   ticketNumber: string; // Jira issue key
+  comment?: string; // optional description/comment from Jira
 }

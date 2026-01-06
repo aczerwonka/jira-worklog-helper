@@ -5,6 +5,7 @@ public class WorklogEntry {
     private String workTime;
     private String ticketNumber;
     private Integer timeSpentSeconds;
+    private String comment;
 
     public WorklogEntry() {}
 
@@ -38,5 +39,13 @@ public class WorklogEntry {
 
     public void setTimeSpentSeconds(Integer timeSpentSeconds) {
         this.timeSpentSeconds = timeSpentSeconds;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
     }
 }

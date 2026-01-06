@@ -1,0 +1,104 @@
+<div class="favorites-container">
+  <div class="favorites-header">
+    <h3>My Favorites</h3>
+    <button 
+      *ngIf="!isEditing() && canAddMore()" 
+      (click)="startAdd()" 
+      class="btn-add-favorite"
+      type="button"
+    >
+      + Add Favorite
+    </button>
+  </div>
+
+  <!-- Edit/Add Form -->
+  <div *ngIf="isEditing()" class="favorite-form-container">
+    <form [formGroup]="favoriteForm" class="favorite-form">
+      <div class="form-row">
+        <label for="fav-ticket" class="form-label">Ticket Key</label>
+        <input
+          id="fav-ticket"
+          type="text"
+          formControlName="ticketKey"
+          placeholder="e.g., PROJ-123"
+          class="form-input"
+        />
+      </div>
+
+      <div class="form-row">
+        <label for="fav-comment" class="form-label">Comment</label>
+        <textarea
+          id="fav-comment"
+          formControlName="comment"
+          placeholder="Default comment for this ticket"
+          class="form-textarea"
+          rows="2"
+        ></textarea>
+      </div>
+
+      <div class="form-row">
+        <label for="fav-time" class="form-label">Default Time (minutes)</label>
+        <input
+          id="fav-time"
+          type="number"
+          formControlName="defaultTimeMinutes"
+          placeholder="30"
+          min="1"
+          class="form-input"
+        />
+      </div>
+
+      <div class="form-actions">
+        <button type="button" (click)="saveFavorite()" class="btn-save">
+          {{ editingId() ? 'Update' : 'Add' }}
+        </button>
+        <button type="button" (click)="cancelEdit()" class="btn-cancel">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Favorites List -->
+  <div class="favorites-list" *ngIf="favorites().length > 0; else noFavorites">
+    <div 
+      *ngFor="let fav of favorites()" 
+      class="favorite-item"
+      (click)="selectFavorite(fav)"
+    >
+      <div class="favorite-content">
+        <div class="favorite-ticket">{{ fav.ticketKey }}</div>
+        <div class="favorite-comment">{{ fav.comment }}</div>
+        <div class="favorite-time">{{ formatTime(fav.defaultTimeMinutes) }}</div>
+      </div>
+      <div class="favorite-actions" (click)="$event.stopPropagation()">
+        <button 
+          type="button"
+          (click)="startEdit(fav)" 
+          class="btn-icon btn-edit"
+          title="Edit"
+        >
+          ✏️
+        </button>
+        <button 
+          type="button"
+          (click)="deleteFavorite(fav)" 
+          class="btn-icon btn-delete"
+          title="Delete"
+        >
+          🗑️
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <ng-template #noFavorites>
+    <div class="empty-favorites" *ngIf="!isEditing()">
+      <p>No favorites yet. Click "Add Favorite" to get started!</p>
+    </div>
+  </ng-template>
+
+  <div class="favorites-count" *ngIf="favorites().length > 0">
+    {{ favorites().length }} / 10 favorites
+  </div>
+</div>

@@ -1,0 +1,5 @@
+# Data files (user data should not be committed)
+data/*.csv
+
+# Docker volumes
+docker/postgres_data/
