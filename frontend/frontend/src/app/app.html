@@ -229,7 +229,7 @@
 
           <!-- Activity Description -->
           <div class="form-section">
-            <label for="comment" class="form-label">Activity Description</label>
+            <label for="comment" class="form-label">Worklog comment</label>
             <!-- Active prefixes badges -->
             <div class="active-prefixes" *ngIf="activePrefixes().length > 0">
               <span
@@ -259,7 +259,7 @@
 
           <!-- Suggested Prefixes START-->
           <div class="form-section" *ngIf="constantPrefixes().length > 0">
-             <label class="section-label">Available Prefixes</label>
+             <label class="section-label">Standard prefixes</label>
              <div class="tag-cloud">
                <button
                  type="button"
@@ -342,6 +342,16 @@
             <span *ngIf="isLoadingSave()">Saving...</span>
           </button>
         </form>
+      </div>
+
+      <div style="margin-top:50px">
+        <span>
+        Add google calendar integration here
+        </span>
+        <br/>
+        <span>
+        Add gitlab history integration here
+        </span>
       </div>
     </div>
   </div>

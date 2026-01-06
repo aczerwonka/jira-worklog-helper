@@ -301,11 +301,12 @@ export class App implements OnInit {
             const prefixes = response.prefixes || [];
             // lista sugerowanych prefixów z backendu (np. do przyszłego UI)
             this.suggestedPrefixes.set(prefixes);
-            // aktywne auto-prefixy na bazie obecnych sugestii
+            // zawsze zapisujemy auto-prefixy (pełne sugestie)
             this.autoPrefixes.set(prefixes);
-            this.activePrefixes.set(prefixes);
-            // po nowym zestawie sugestii czyścimy „wyłączone” auto-prefixy
-            this.removedPrefixes.set([]);
+            // aktywne auto-prefixy: zachowaj soft-usunięte (removedPrefixes) aby były widoczne jako nieaktywne
+            const removed = this.removedPrefixes() || [];
+            const union = Array.from(new Set([...prefixes, ...removed]));
+            this.activePrefixes.set(union);
           },
           error: (err) => console.error('Error fetching suggestions', err),
         });
@@ -332,12 +333,13 @@ export class App implements OnInit {
             this.suggestedPrefixes.set(prefixes);
             // auto-prefixy wyznaczone na podstawie komentarza
             this.autoPrefixes.set(prefixes);
-            this.activePrefixes.set(prefixes);
-            // po nowym zestawie sugestii czyścimy „wyłączone” auto-prefixy
-            this.removedPrefixes.set([]);
+            // przy aktualizacji sugestii: zachowaj soft-usunięte prefixy tak, żeby były widoczne jako nieaktywne
+            const removed = this.removedPrefixes() || [];
+            const union = Array.from(new Set([...prefixes, ...removed]));
+            this.activePrefixes.set(union);
           },
-           error: (err) => { /* silent */ console.error('Error fetching suggestions from comment input', err); }
-         });
+             error: (err) => { /* silent */ console.error('Error fetching suggestions from comment input', err); }
+          });
        } catch (e) {
          // ignore
        }
