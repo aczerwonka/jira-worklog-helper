@@ -701,9 +701,14 @@ body, html {
   background: transparent;
   border: none;
   color: $primary-blue;
+  font-size: 18px;
   font-weight: 700;
   cursor: pointer;
   padding: 0 4px;
+  label {
+    padding: 5px;
+    font-weight: bolder;
+  }
 }
 
 /* Modal styles (large centered popup) */

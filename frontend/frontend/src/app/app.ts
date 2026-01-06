@@ -220,12 +220,16 @@ export class App implements OnInit {
     const ticketKey = this.worklogForm.get('ticketKey')?.value;
     const comment = this.worklogForm.get('comment')?.value;
 
-    if (ticketKey) {
-      this.worklogService.getSuggestedPrefixes({ ticketKey, baseComment: comment }).subscribe({
-        next: (response) => this.suggestedPrefixes.set(response.prefixes),
-        error: (err) => console.error('Error fetching suggestions', err),
-      });
-    }
+    // Trigger suggestion request even if ticketKey is empty — allow suggestions based on comment alone
+    // Require at least some input (comment or ticketKey) to avoid empty requests
+    const hasComment = typeof comment === 'string' && comment.trim().length > 0;
+    const hasTicketKey = typeof ticketKey === 'string' && ticketKey.trim().length > 0;
+    if (!hasComment && !hasTicketKey) return;
+
+    this.worklogService.getSuggestedPrefixes({ ticketKey, baseComment: comment }).subscribe({
+      next: (response) => this.suggestedPrefixes.set(response.prefixes),
+      error: (err) => console.error('Error fetching suggestions', err),
+    });
   }
 
   // add suggested prefix as active badge (dedupe)
@@ -292,7 +296,9 @@ export class App implements OnInit {
         const ticketKey = this.worklogForm.get('ticketKey')?.value;
         const baseComment = value || '';
         // only query suggestions when we have either ticketKey or some comment text
-        if (!ticketKey || (typeof baseComment === 'string' && baseComment.trim().length === 0)) return;
+        const hasComment = typeof baseComment === 'string' && baseComment.trim().length > 0;
+        const hasTicketKey = typeof ticketKey === 'string' && ticketKey.trim().length > 0;
+        if (!hasComment && !hasTicketKey) return;
         this.worklogService.getSuggestedPrefixes({ ticketKey, baseComment }).subscribe({
           next: (resp) => {
             const prefixes = resp.prefixes || [];
@@ -346,7 +352,19 @@ export class App implements OnInit {
       next: (response) => {
         // alert('Worklog created successfully');
         this.showToast('Worklog created successfully');
+        // preserve date and duration selected in the form (do not clear chosen date/time)
+        const currentDateVal = this.worklogForm.get('date')?.value;
+        const preservedHours = this.selectedHours();
+        const preservedMinutes = this.selectedMinutes();
         this.worklogForm.reset();
+        if (currentDateVal) {
+          this.worklogForm.patchValue({ date: currentDateVal });
+        }
+        // restore duration signals and form seconds
+        this.selectedHours.set(preservedHours ?? 0);
+        this.selectedMinutes.set(preservedMinutes ?? 0);
+        const restoredSeconds = (preservedHours ?? 0) * 3600 + (preservedMinutes ?? 0) * 60;
+        this.worklogForm.patchValue({ timeSpentSeconds: restoredSeconds });
         this.selectedTicket.set('');
         this.selectedTicketSummary.set('');
         this.suggestedPrefixes.set([]);

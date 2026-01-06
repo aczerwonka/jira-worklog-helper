@@ -224,7 +224,7 @@
             <div class="active-prefixes" *ngIf="activePrefixes().length > 0">
               <span class="prefix-badge" *ngFor="let p of activePrefixes()" [class.removed]="removedPrefixes().includes(p)">
                 [{{ p }}]
-                <button type="button" class="prefix-remove" (click)="removeActivePrefix(p)">x</button>
+                <button type="button" class="prefix-remove" (click)="removeActivePrefix(p)"><label>X</label></button>
               </span>
             </div>
             <textarea
