@@ -567,13 +567,42 @@ body, html {
 }
 
 .week-worklog-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  /* Use grid so ticket and time are on the top row, summary/comment spans full width on second row */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 6px 8px;
   padding: 6px 8px;
   background: #fff;
   border-radius: 6px;
-  border: 1px solid $border-light
+  border: 1px solid $border-light;
+  align-items: center;
+}
+
+.week-worklog-item .work-ticket {
+  grid-column: 1 / 2;
+  grid-row: 1;
+  font-weight: 700;
+  color: $primary-blue;
+  font-size: 13px;
+}
+
+.week-worklog-item .work-time {
+  grid-column: 2 / 3;
+  grid-row: 1;
+  justify-self: end;
+  color: $text-secondary;
+  font-size: 12px;
+}
+
+.week-worklog-item .work-comment {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  color: $text-secondary;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .day-view {
