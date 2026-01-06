@@ -5,11 +5,12 @@ import { HttpClientModule } from '@angular/common/http';
 import { WorklogService } from './services/worklog.service';
 import { Worklog, FavoriteTicket, FavoriteWorklog, WorklogHistoryItem, JiraIssueSummary, WorklogEntry } from './models/worklog.model';
 import { FavoritesComponent } from './favorites/favorites.component';
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, HttpClientModule, FavoritesComponent],
+  imports: [CommonModule, ReactiveFormsModule, HttpClientModule, FormsModule, FavoritesComponent],
   templateUrl: './app.html',
   styleUrls: ['./app.scss'],
   providers: [WorklogService],
@@ -21,6 +22,15 @@ export class App implements OnInit {
   favorites = signal<FavoriteTicket[]>([]);
   history = signal<WorklogHistoryItem[]>([]);
   suggestedPrefixes = signal<string[]>([]);
+  // full prefixes list from backend for modal
+  prefixesList = signal<any[]>([]);
+  prefixesEnabled = signal<boolean>(true);
+  // active prefixes for current form
+  activePrefixes = signal<string[]>([]);
+  // soft-deleted (temporarily disabled) prefixes for current form — these are NOT removed from activePrefixes but excluded on save
+  removedPrefixes = signal<string[]>([]);
+  // modal visibility
+  showPrefixesModal = signal<boolean>(false);
   issueSummary = signal<JiraIssueSummary | null>(null);
   isLoadingSave = signal(false);
   isLoadingSummary = signal(false);
@@ -44,6 +54,9 @@ export class App implements OnInit {
 
   // legacy/template compatibility: some templates may still reference durationOptions
   durationOptions: number[] = []; // kept empty to avoid rendering legacy single-list UI
+
+  private ticketInputDebounce: any = null;
+  private commentInputDebounce: any = null;
 
   constructor(
     private fb: FormBuilder,
@@ -215,50 +228,94 @@ export class App implements OnInit {
     }
   }
 
+  // add suggested prefix as active badge (dedupe)
   addPrefixToComment(prefix: string): void {
-    const commentControl = this.worklogForm.get('comment');
-    const currentValue = commentControl?.value || '';
-    const newValue = currentValue ? `${currentValue} ${prefix}` : prefix;
-    commentControl?.setValue(newValue);
+    if (!prefix) return;
+    const list = this.activePrefixes();
+    const removed = this.removedPrefixes();
+    // don't re-add if already active
+    if (list.includes(prefix)) {
+      // if it was soft-deleted, restore it
+      if (removed.includes(prefix)) {
+        this.removedPrefixes.set(removed.filter(p => p !== prefix));
+      }
+      return;
+    }
+    // don't add if it's currently soft-deleted (shouldn't happen because removed prefixes remain in list), but guard anyway
+    if (removed.includes(prefix)) return;
+    this.activePrefixes.set([...list, prefix]);
   }
 
-  setDuration(minutes: number): void {
-    // kept for backward compatibility but prefer setHours/setMinutes
-    const hrs = this.selectedHours();
-    const mins = minutes;
-    this.selectedMinutes.set(mins);
-    this.worklogForm.patchValue({ timeSpentSeconds: hrs * 3600 + mins * 60 });
+  addActivePrefix(prefix: string): void {
+    this.addPrefixToComment(prefix);
   }
 
-  setHours(h: number): void {
-    this.selectedHours.set(h);
-    const mins = this.selectedMinutes();
-    this.worklogForm.patchValue({ timeSpentSeconds: h * 3600 + mins * 60 });
+  // soft toggle: mark prefix as removed (soft-delete) so it won't be included when saving; clicking again restores it
+  removeActivePrefix(prefix: string): void {
+    const removed = this.removedPrefixes();
+    if (removed.includes(prefix)) {
+      // restore
+      this.removedPrefixes.set(removed.filter(p => p !== prefix));
+    } else {
+      // mark removed
+      this.removedPrefixes.set([...removed, prefix]);
+    }
   }
 
-  setMinutes(m: number): void {
-    this.selectedMinutes.set(m);
-    const hrs = this.selectedHours();
-    this.worklogForm.patchValue({ timeSpentSeconds: hrs * 3600 + m * 60 });
+  // debounced handler for manual typing
+  onTicketKeyInput(value: string): void {
+    if (this.ticketInputDebounce) clearTimeout(this.ticketInputDebounce);
+    this.ticketInputDebounce = setTimeout(() => {
+      if (value && value.length > 2) {
+        this.worklogService.getSuggestedPrefixes({ ticketKey: value, baseComment: this.worklogForm.get('comment')?.value }).subscribe({
+          next: (response) => {
+            const prefixes = response.prefixes || [];
+            this.suggestedPrefixes.set(prefixes);
+            for (const p of prefixes) {
+              // auto-add suggested prefixes
+              this.addActivePrefix(p);
+            }
+          },
+          error: (err) => console.error('Error fetching suggestions', err),
+        });
+        this.fetchIssueSummary(value);
+      }
+    }, 300);
   }
 
-  // --- Added compatibility wrappers used by the template ---
-  setSelectedHour(hour: number): void {
-    this.setHours(hour);
+  // debounced handler for typing in Activity Description textarea
+  onCommentInput(value: string): void {
+    if (this.commentInputDebounce) clearTimeout(this.commentInputDebounce);
+    this.commentInputDebounce = setTimeout(() => {
+      try {
+        if (!this.prefixesEnabled()) return; // prefixes disabled
+        const ticketKey = this.worklogForm.get('ticketKey')?.value;
+        const baseComment = value || '';
+        // only query suggestions when we have either ticketKey or some comment text
+        if (!ticketKey || (typeof baseComment === 'string' && baseComment.trim().length === 0)) return;
+        this.worklogService.getSuggestedPrefixes({ ticketKey, baseComment }).subscribe({
+          next: (resp) => {
+            const prefixes = resp.prefixes || [];
+            this.suggestedPrefixes.set(prefixes);
+            // auto-add suggested prefixes as badges
+            for (const p of prefixes) {
+              const list = this.activePrefixes();
+              if (p && !list.includes(p)) {
+                this.activePrefixes.set([...list, p]);
+              }
+            }
+          },
+          error: (err) => { /* silent */ console.error('Error fetching suggestions from comment input', err); }
+        });
+      } catch (e) {
+        // ignore
+      }
+    }, 100);
   }
 
-  getSelectedHour(): number {
-    return this.selectedHours();
+  closePrefixesModal(): void {
+    this.showPrefixesModal.set(false);
   }
-
-  setSelectedMinute(minute: number): void {
-    this.setMinutes(minute);
-  }
-
-  getSelectedMinute(): number {
-    return this.selectedMinutes();
-  }
-  // --- end wrappers ---
 
   saveWorklog(): void {
     if (this.worklogForm.invalid) {
@@ -270,9 +327,15 @@ export class App implements OnInit {
     this.isLoadingSave.set(true);
     // Build explicit payload to ensure `date` is included and correctly formatted
     const form = this.worklogForm.value;
+    // exclude soft-deleted prefixes
+    const active = this.activePrefixes() || [];
+    const removed = this.removedPrefixes() || [];
+    const effective = active.filter(p => !removed.includes(p));
+    const prefixString = effective.map(p => `[${p}]`).join('');
+    const finalComment = `${prefixString}${prefixString ? ' ' : ''}${(form.comment || '').trim()}`.trim();
     const payload: Worklog = {
       ticketKey: form.ticketKey,
-      comment: form.comment,
+      comment: finalComment,
       timeSpentSeconds: form.timeSpentSeconds,
       date: form.date,
       started: this.makeStartedTimestamp(form.date)
@@ -287,6 +350,8 @@ export class App implements OnInit {
         this.selectedTicket.set('');
         this.selectedTicketSummary.set('');
         this.suggestedPrefixes.set([]);
+        this.activePrefixes.set([]);
+        this.removedPrefixes.set([]);
         this.issueSummary.set(null);
         this.loadHistory();
         // odśwież kalendarz po zapisaniu nowego worklogu
@@ -673,4 +738,121 @@ export class App implements OnInit {
     if (totalMinutes <= 0) return '';
     return this.formatMinutesToEnglish(totalMinutes);
   }
+
+  openPrefixesModal(): void {
+    this.showPrefixesModal.set(true);
+    this.loadPrefixesList();
+    this.loadPrefixesEnabled();
+  }
+
+  // prefix management UI state
+  editingPrefix: any = null;
+  addingPrefix: boolean = false;
+  newPrefix: any = { type: '', prefix: '', label: '', enabled: true };
+
+  loadPrefixesList(): void {
+    this.worklogService.getPrefixes().subscribe({
+      next: (data) => this.prefixesList.set(data || []),
+      error: (err) => { console.error('Failed to load prefixes', err); this.prefixesList.set([]); }
+    });
+  }
+
+  loadPrefixesEnabled(): void {
+    this.worklogService.getPrefixesEnabled().subscribe({
+      next: (flag) => this.prefixesEnabled.set(!!flag),
+      error: (err) => { console.error('Failed to load prefixes enabled', err); this.prefixesEnabled.set(true); }
+    });
+  }
+
+  togglePrefixesEnabled(): void {
+    const newVal = !this.prefixesEnabled();
+    this.worklogService.setPrefixesEnabled(newVal).subscribe({
+      next: () => this.prefixesEnabled.set(newVal),
+      error: (err) => console.error('Failed to set prefixes enabled', err)
+    });
+  }
+
+  startAddPrefix(): void {
+    this.addingPrefix = true;
+    this.newPrefix = { type: '', prefix: '', label: '', enabled: true };
+  }
+
+  cancelAdd(): void {
+    this.addingPrefix = false;
+    this.newPrefix = { type: '', prefix: '', label: '', enabled: true };
+  }
+
+  createPrefix(): void {
+    const payload = { ...this.newPrefix };
+    this.worklogService.createPrefix(payload).subscribe({
+      next: (created) => {
+        this.prefixesList.set([...(this.prefixesList() || []), created]);
+        this.addingPrefix = false;
+      },
+      error: (err) => console.error('Failed to create prefix', err)
+    });
+  }
+
+  editPrefix(p: any): void {
+    // create shallow copy for editing
+    this.editingPrefix = { ...p };
+  }
+
+  cancelEditing(): void {
+    this.editingPrefix = null;
+  }
+
+  saveEditingPrefix(): void {
+    if (!this.editingPrefix || !this.editingPrefix.id) return;
+    this.worklogService.updatePrefix(this.editingPrefix.id, this.editingPrefix).subscribe({
+      next: (updated) => {
+        const list = (this.prefixesList() || []).map((x:any) => x.id === updated.id ? updated : x);
+        this.prefixesList.set(list);
+        this.editingPrefix = null;
+      },
+      error: (err) => console.error('Failed to update prefix', err)
+    });
+  }
+
+  deletePrefix(p: any): void {
+    if (!p || !p.id) return;
+    this.worklogService.deletePrefix(p.id).subscribe({
+      next: () => {
+        this.prefixesList.set((this.prefixesList() || []).filter((x:any) => x.id !== p.id));
+      },
+      error: (err) => console.error('Failed to delete prefix', err)
+    });
+  }
+
+  // set hours and update form seconds
+  setHours(h: number): void {
+    this.selectedHours.set(h);
+    const mins = this.selectedMinutes();
+    this.worklogForm.patchValue({ timeSpentSeconds: h * 3600 + mins * 60 });
+  }
+
+  // set minutes and update form seconds
+  setMinutes(m: number): void {
+    this.selectedMinutes.set(m);
+    const hrs = this.selectedHours();
+    this.worklogForm.patchValue({ timeSpentSeconds: hrs * 3600 + m * 60 });
+  }
+
+  // --- Added compatibility wrappers used by the template ---
+  setSelectedHour(hour: number): void {
+    this.setHours(hour);
+  }
+
+  getSelectedHour(): number {
+    return this.selectedHours();
+  }
+
+  setSelectedMinute(minute: number): void {
+    this.setMinutes(minute);
+  }
+
+  getSelectedMinute(): number {
+    return this.selectedMinutes();
+  }
+  // --- end wrappers ---
 }

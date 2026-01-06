@@ -29,6 +29,7 @@ import com.jiraworklog.worklog_backend.service.CsvService;
 import com.jiraworklog.worklog_backend.service.JiraService;
 import com.jiraworklog.worklog_backend.service.SuggestionService;
 import com.jiraworklog.worklog_backend.service.FavoritesService;
+import com.jiraworklog.worklog_backend.service.PrefixesService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,16 +43,19 @@ public class WorklogController {
     private final SuggestionService suggestionService;
     private final CsvService csvService;
     private final FavoritesService favoritesService;
-    
+    private final PrefixesService prefixesService;
+
     @Value("${worklog.username:arek}")
     private String worklogUsername;
 
     public WorklogController(JiraService jiraService, SuggestionService suggestionService, 
-                           CsvService csvService, FavoritesService favoritesService) {
+                           CsvService csvService, FavoritesService favoritesService,
+                           PrefixesService prefixesService) {
         this.jiraService = jiraService;
         this.suggestionService = suggestionService;
         this.csvService = csvService;
         this.favoritesService = favoritesService;
+        this.prefixesService = prefixesService;
     }
 
     @PostMapping("/api/worklogs")
@@ -99,6 +103,29 @@ public class WorklogController {
         return ResponseEntity.ok(new SuggestionResponse(prefixes));
     }
 
+    @GetMapping("/api/prefixes")
+    public ResponseEntity<List<?>> getPrefixes() {
+        return ResponseEntity.ok(prefixesService.getAllPrefixes());
+    }
+
+    @PostMapping("/api/prefixes")
+    public ResponseEntity<com.jiraworklog.worklog_backend.dto.PrefixMapping> createPrefix(@RequestBody com.jiraworklog.worklog_backend.dto.PrefixMapping mapping) {
+        com.jiraworklog.worklog_backend.dto.PrefixMapping created = prefixesService.addPrefix(mapping);
+        return ResponseEntity.ok(created);
+    }
+
+    @PutMapping("/api/prefixes/{id}")
+    public ResponseEntity<com.jiraworklog.worklog_backend.dto.PrefixMapping> updatePrefix(@PathVariable String id, @RequestBody com.jiraworklog.worklog_backend.dto.PrefixMapping mapping) {
+        com.jiraworklog.worklog_backend.dto.PrefixMapping updated = prefixesService.updatePrefix(id, mapping);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/api/prefixes/{id}")
+    public ResponseEntity<Void> deletePrefix(@PathVariable String id) {
+        prefixesService.deletePrefix(id);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/api/favorites")
     public ResponseEntity<?> getFavorites() {
         // Keep backward compatibility - return old CSV favorites
@@ -134,5 +161,16 @@ public class WorklogController {
         String username = worklogUsername;
         List<WorklogEntry> list = jiraService.getWorklogsBetween(from, to, username);
         return ResponseEntity.ok(list);
+    }
+
+    @GetMapping("/api/prefixes/enabled")
+    public ResponseEntity<Boolean> getPrefixesEnabled() {
+        return ResponseEntity.ok(prefixesService.isPrefixesEnabled());
+    }
+
+    @PutMapping("/api/prefixes/enabled")
+    public ResponseEntity<Void> setPrefixesEnabled(@RequestBody Boolean enabled) {
+        prefixesService.setPrefixesEnabled(enabled != null && enabled);
+        return ResponseEntity.ok().build();
     }
 }

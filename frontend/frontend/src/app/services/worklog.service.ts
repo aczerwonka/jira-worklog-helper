@@ -73,4 +73,30 @@ export class WorklogService {
   getWorklogsList(from: string, to: string) {
     return this.http.get<WorklogEntry[]>(`${this.apiUrl}/worklogs/list?from=${from}&to=${to}`);
   }
+
+  // Prefixes CRUD
+  getPrefixes() {
+    return this.http.get<any[]>(`${this.apiUrl}/prefixes`);
+  }
+
+  createPrefix(mapping: any) {
+    return this.http.post<any>(`${this.apiUrl}/prefixes`, mapping);
+  }
+
+  updatePrefix(id: string, mapping: any) {
+    return this.http.put<any>(`${this.apiUrl}/prefixes/${id}`, mapping);
+  }
+
+  deletePrefix(id: string) {
+    return this.http.delete<void>(`${this.apiUrl}/prefixes/${id}`);
+  }
+
+  // Enabled flag
+  getPrefixesEnabled() {
+    return this.http.get<boolean>(`${this.apiUrl}/prefixes/enabled`);
+  }
+
+  setPrefixesEnabled(enabled: boolean) {
+    return this.http.put<void>(`${this.apiUrl}/prefixes/enabled`, enabled);
+  }
 }

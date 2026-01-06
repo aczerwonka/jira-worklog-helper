@@ -7,6 +7,7 @@
         <h1>Worklog Tracker</h1>
       </div>
       <div class="navbar-user">
+        <button type="button" class="btn-prefixes" (click)="openPrefixesModal()">PREFIXES</button>
         <span class="username">admin</span>
       </div>
     </div>
@@ -206,6 +207,7 @@
               formControlName="ticketKey"
               placeholder="e.g., DUM-123"
               (change)="onTicketKeyChange($any($event.target).value)"
+              (input)="onTicketKeyInput($any($event.target).value)"
               class="form-input"
             />
             <!-- always render placeholder to avoid layout jump; loader is absolutely positioned inside it -->
@@ -218,12 +220,20 @@
           <!-- Activity Description -->
           <div class="form-section">
             <label for="comment" class="form-label">Activity Description</label>
+            <!-- Active prefixes badges -->
+            <div class="active-prefixes" *ngIf="activePrefixes().length > 0">
+              <span class="prefix-badge" *ngFor="let p of activePrefixes()" [class.removed]="removedPrefixes().includes(p)">
+                [{{ p }}]
+                <button type="button" class="prefix-remove" (click)="removeActivePrefix(p)">x</button>
+              </span>
+            </div>
             <textarea
               id="comment"
               formControlName="comment"
               placeholder="Describe what you worked on..."
               class="form-textarea"
               (focus)="fetchSuggestedPrefixes()"
+              (input)="onCommentInput($any($event.target).value)"
             ></textarea>
           </div>
 
@@ -317,4 +327,50 @@
 
   <!-- Toast container (right-bottom) -->
   <div id="toast-container" aria-live="polite" style="position:fixed;right:16px;bottom:16px;z-index:110;display:flex;flex-direction:column;gap:8px;align-items:flex-end;"></div>
+
+  <!-- simple prefixes modal -->
+  <div class="modal-backdrop" *ngIf="showPrefixesModal()" (click)="closePrefixesModal()"></div>
+  <div class="modal" *ngIf="showPrefixesModal()">
+    <div class="modal-header">
+      <h3>Manage Prefixes</h3>
+      <button type="button" class="modal-close" (click)="closePrefixesModal()">Close</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-controls">
+        <label><input type="checkbox" [checked]="prefixesEnabled()" (change)="togglePrefixesEnabled()" /> Prefixes enabled</label>
+        <button type="button" (click)="startAddPrefix()">Add prefix</button>
+      </div>
+
+      <div class="prefixes-table">
+        <table>
+          <thead><tr><th>Type (keyword)</th><th>Prefix</th><th>Enabled</th><th>Actions</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let p of prefixesList()">
+              <td *ngIf="editingPrefix?.id !== p.id">{{p.type}}</td>
+              <td *ngIf="editingPrefix?.id === p.id"><input [(ngModel)]="editingPrefix.type"/></td>
+              <td *ngIf="editingPrefix?.id !== p.id">{{p.prefix}}</td>
+              <td *ngIf="editingPrefix?.id === p.id"><input [(ngModel)]="editingPrefix.prefix"/></td>
+              <td *ngIf="editingPrefix?.id !== p.id">{{p.enabled}}</td>
+              <td *ngIf="editingPrefix?.id === p.id"><input type="checkbox" [(ngModel)]="editingPrefix.enabled"/></td>
+              <td>
+                <button *ngIf="editingPrefix?.id !== p.id" type="button" (click)="editPrefix(p)">Edit</button>
+                <button *ngIf="editingPrefix?.id === p.id" type="button" (click)="saveEditingPrefix()">Save</button>
+                <button type="button" (click)="deletePrefix(p)">Delete</button>
+                <button *ngIf="editingPrefix?.id === p.id" type="button" (click)="cancelEditing()">Cancel</button>
+              </td>
+            </tr>
+            <tr *ngIf="addingPrefix">
+              <td><input [(ngModel)]="newPrefix.type"/></td>
+              <td><input [(ngModel)]="newPrefix.prefix"/></td>
+              <td><input type="checkbox" [(ngModel)]="newPrefix.enabled"/></td>
+              <td>
+                <button type="button" (click)="createPrefix()">Create</button>
+                <button type="button" (click)="cancelAdd()">Cancel</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+     </div>
+  </div>
 </div>
