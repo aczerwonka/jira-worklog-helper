@@ -103,6 +103,11 @@ public class WorklogController {
         return ResponseEntity.ok(new SuggestionResponse(prefixes));
     }
 
+    @GetMapping("/api/constant-prefixes")
+    public ResponseEntity<List<String>> getConstantPrefixes() {
+        return ResponseEntity.ok(prefixesService.getConstantPrefixes());
+    }
+
     @GetMapping("/api/prefixes")
     public ResponseEntity<List<?>> getPrefixes() {
         return ResponseEntity.ok(prefixesService.getAllPrefixes());
@@ -168,9 +173,9 @@ public class WorklogController {
         return ResponseEntity.ok(prefixesService.isPrefixesEnabled());
     }
 
-    @PutMapping("/api/prefixes/enabled")
-    public ResponseEntity<Void> setPrefixesEnabled(@RequestBody Boolean enabled) {
-        prefixesService.setPrefixesEnabled(enabled != null && enabled);
-        return ResponseEntity.ok().build();
-    }
+//    @PutMapping("/api/prefixes/enabled")
+//    public ResponseEntity<Void> setPrefixesEnabled(@RequestBody Boolean enabled) {
+//        prefixesService.setPrefixesEnabled(enabled != null && enabled);
+//        return ResponseEntity.ok().build();
+//    }
 }

@@ -421,11 +421,19 @@ body, html {
 
 .tag-chip {
   padding: 6px 12px;
-  background-color: #f0f9ff;
-  color: $primary-blue;
-  border: 1px solid #bfdbfe;
+  background-color: #f3f4f6; /* light gray */
+  color: #475569; /* slate-600 */
+  border: 1px solid #e6e9ee;
   border-radius: 16px;
-  font-size: 12px
+  font-size: 12px;
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.tag-chip.active {
+  background-color: #10b981; /* green-500 */
+  color: #ffffff;
+  border-color: rgba(16,185,129,0.2);
+  box-shadow: 0 6px 18px rgba(16,185,129,0.12);
 }
 
 .duration-grid {

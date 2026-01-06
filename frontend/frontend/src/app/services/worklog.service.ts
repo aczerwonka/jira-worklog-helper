@@ -99,4 +99,9 @@ export class WorklogService {
   setPrefixesEnabled(enabled: boolean) {
     return this.http.put<void>(`${this.apiUrl}/prefixes/enabled`, enabled);
   }
+
+  // Get constant prefixes from CSV-backed endpoint
+  getConstantPrefixes() {
+    return this.http.get<string[]>(`${this.apiUrl}/constant-prefixes`);
+  }
 }

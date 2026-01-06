@@ -222,9 +222,19 @@
             <label for="comment" class="form-label">Activity Description</label>
             <!-- Active prefixes badges -->
             <div class="active-prefixes" *ngIf="activePrefixes().length > 0">
-              <span class="prefix-badge" *ngFor="let p of activePrefixes()" [class.removed]="removedPrefixes().includes(p)">
+              <span
+                class="prefix-badge"
+                *ngFor="let p of activePrefixes()"
+                [class.removed]="removedPrefixes().includes(p)"
+              >
                 [{{ p }}]
-                <button type="button" class="prefix-remove" (click)="removeActivePrefix(p)"><label>X</label></button>
+                <button
+                  type="button"
+                  class="prefix-remove"
+                  (click)="removeActivePrefix(p)"
+                >
+                  <label>X</label>
+                </button>
               </span>
             </div>
             <textarea
@@ -237,21 +247,22 @@
             ></textarea>
           </div>
 
-          <!-- Suggested Prefixes -->
-          <div class="form-section" *ngIf="suggestedPrefixes().length > 0">
-            <label class="section-label">Suggested Tags</label>
-            <div class="tag-cloud">
-              <button
-                type="button"
-                *ngFor="let prefix of suggestedPrefixes()"
-                (click)="addPrefixToComment(prefix)"
-                class="tag-chip"
-              >
-                {{ prefix }}
-              </button>
-            </div>
-          </div>
-
+          <!-- Suggested Prefixes START-->
+          <div class="form-section" *ngIf="constantPrefixes().length > 0">
+             <label class="section-label">Available Prefixes</label>
+             <div class="tag-cloud">
+               <button
+                 type="button"
+                 *ngFor="let prefix of constantPrefixes()"
+                 (click)="toggleConstantPrefix(prefix)"
+                 [class.active]="selectedConstantPrefixes().includes(prefix)"
+                 class="tag-chip"
+               >
+                 {{ prefix }}
+               </button>
+             </div>
+           </div>
+          <!-- Suggested Prefixes END-->
           <!-- Date Picker -->
           <div class="form-section">
             <label for="date" class="form-label">Date</label>

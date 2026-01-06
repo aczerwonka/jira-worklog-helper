@@ -22,14 +22,20 @@ export class App implements OnInit {
   favorites = signal<FavoriteTicket[]>([]);
   history = signal<WorklogHistoryItem[]>([]);
   suggestedPrefixes = signal<string[]>([]);
-  // full prefixes list from backend for modal
+  // constant prefixes loaded from constant_prefixes.csv via backend
+  constantPrefixes = signal<string[]>([]);
+  // auto-deduced prefixes (from mappings/suggestions) — kept separate from manual constant prefixes
+  autoPrefixes = signal<string[]>([]);
+  // pełna lista prefixów (konfigurowalna, modal)
   prefixesList = signal<any[]>([]);
   prefixesEnabled = signal<boolean>(true);
-  // active prefixes for current form
+  // aktywne prefixy na podstawie komentarza (auto) – tylko na bieżący formularz
   activePrefixes = signal<string[]>([]);
-  // soft-deleted (temporarily disabled) prefixes for current form — these are NOT removed from activePrefixes but excluded on save
+  // wyłączone (soft-delete) auto-prefixy dla aktualnego formularza – pomijane przy POST
   removedPrefixes = signal<string[]>([]);
-  // modal visibility
+  // stałe prefixy wybrane ręcznie (z constantPrefixes) – trwają pomiędzy POSTami
+  selectedConstantPrefixes = signal<string[]>([]);
+  // widoczność modala PREFIXES
   showPrefixesModal = signal<boolean>(false);
   issueSummary = signal<JiraIssueSummary | null>(null);
   isLoadingSave = signal(false);
@@ -81,6 +87,14 @@ export class App implements OnInit {
     this.buildCalendar();
     // load full range for calendar
     this.loadCalendarWorklogsForCurrentView();
+    this.loadConstantPrefixes();
+  }
+
+  loadConstantPrefixes(): void {
+    this.worklogService.getConstantPrefixes().subscribe({
+      next: (data) => this.constantPrefixes.set(data || []),
+      error: (err) => { console.error('Failed to load constant prefixes', err); this.constantPrefixes.set([]); }
+    });
   }
 
   // Load worklogs for the currently visible calendar range
@@ -237,21 +251,32 @@ export class App implements OnInit {
     if (!prefix) return;
     const list = this.activePrefixes();
     const removed = this.removedPrefixes();
-    // don't re-add if already active
+    // jeżeli już jest aktywny, nic nie rób (auto-prefixy są tylko z jednego źródła)
     if (list.includes(prefix)) {
-      // if it was soft-deleted, restore it
-      if (removed.includes(prefix)) {
-        this.removedPrefixes.set(removed.filter(p => p !== prefix));
-      }
       return;
     }
-    // don't add if it's currently soft-deleted (shouldn't happen because removed prefixes remain in list), but guard anyway
-    if (removed.includes(prefix)) return;
+    // jeżeli był oznaczony jako usunięty, zdejmij go z removed
+    if (removed.includes(prefix)) {
+      this.removedPrefixes.set(removed.filter(p => p !== prefix));
+    }
     this.activePrefixes.set([...list, prefix]);
   }
 
   addActivePrefix(prefix: string): void {
     this.addPrefixToComment(prefix);
+  }
+
+  // Toggle constant prefix active state (for tags from constant_prefixes.csv)
+  toggleConstantPrefix(prefix: string): void {
+    if (!prefix) return;
+    const selected = this.selectedConstantPrefixes();
+    // jeśli już zaznaczony – wyłącz (usuń z listy wybranych)
+    if (selected.includes(prefix)) {
+      this.selectedConstantPrefixes.set(selected.filter(p => p !== prefix));
+      return;
+    }
+    // jeśli nie zaznaczony – dodaj jako „na stałe” aktywny
+    this.selectedConstantPrefixes.set([...selected, prefix]);
   }
 
   // soft toggle: mark prefix as removed (soft-delete) so it won't be included when saving; clicking again restores it
@@ -274,11 +299,13 @@ export class App implements OnInit {
         this.worklogService.getSuggestedPrefixes({ ticketKey: value, baseComment: this.worklogForm.get('comment')?.value }).subscribe({
           next: (response) => {
             const prefixes = response.prefixes || [];
+            // lista sugerowanych prefixów z backendu (np. do przyszłego UI)
             this.suggestedPrefixes.set(prefixes);
-            for (const p of prefixes) {
-              // auto-add suggested prefixes
-              this.addActivePrefix(p);
-            }
+            // aktywne auto-prefixy na bazie obecnych sugestii
+            this.autoPrefixes.set(prefixes);
+            this.activePrefixes.set(prefixes);
+            // po nowym zestawie sugestii czyścimy „wyłączone” auto-prefixy
+            this.removedPrefixes.set([]);
           },
           error: (err) => console.error('Error fetching suggestions', err),
         });
@@ -303,19 +330,17 @@ export class App implements OnInit {
           next: (resp) => {
             const prefixes = resp.prefixes || [];
             this.suggestedPrefixes.set(prefixes);
-            // auto-add suggested prefixes as badges
-            for (const p of prefixes) {
-              const list = this.activePrefixes();
-              if (p && !list.includes(p)) {
-                this.activePrefixes.set([...list, p]);
-              }
-            }
+            // auto-prefixy wyznaczone na podstawie komentarza
+            this.autoPrefixes.set(prefixes);
+            this.activePrefixes.set(prefixes);
+            // po nowym zestawie sugestii czyścimy „wyłączone” auto-prefixy
+            this.removedPrefixes.set([]);
           },
-          error: (err) => { /* silent */ console.error('Error fetching suggestions from comment input', err); }
-        });
-      } catch (e) {
-        // ignore
-      }
+           error: (err) => { /* silent */ console.error('Error fetching suggestions from comment input', err); }
+         });
+       } catch (e) {
+         // ignore
+       }
     }, 100);
   }
 
@@ -333,11 +358,17 @@ export class App implements OnInit {
     this.isLoadingSave.set(true);
     // Build explicit payload to ensure `date` is included and correctly formatted
     const form = this.worklogForm.value;
-    // exclude soft-deleted prefixes
+    // auto-prefixy (z komentarza) po odfiltrowaniu soft-deleted
     const active = this.activePrefixes() || [];
     const removed = this.removedPrefixes() || [];
-    const effective = active.filter(p => !removed.includes(p));
-    const prefixString = effective.map(p => `[${p}]`).join('');
+    const autos = active.filter(p => !removed.includes(p));
+    // stałe prefixy wybrane na stałe (nie resetujemy między POST)
+    const manual = this.selectedConstantPrefixes() || [];
+    const seen = new Set<string>();
+    const combined: string[] = [];
+    for (const p of manual) { if (p && !seen.has(p)) { seen.add(p); combined.push(p); } }
+    for (const p of autos) { if (p && !seen.has(p)) { seen.add(p); combined.push(p); } }
+    const prefixString = combined.map(p => `[${p}]`).join('');
     const finalComment = `${prefixString}${prefixString ? ' ' : ''}${(form.comment || '').trim()}`.trim();
     const payload: Worklog = {
       ticketKey: form.ticketKey,
@@ -368,12 +399,14 @@ export class App implements OnInit {
         this.selectedTicket.set('');
         this.selectedTicketSummary.set('');
         this.suggestedPrefixes.set([]);
+        // po POST resetujemy auto-prefixy i ich soft-delete; stałe prefixy zostają
         this.activePrefixes.set([]);
+        this.autoPrefixes.set([]);
         this.removedPrefixes.set([]);
-        this.issueSummary.set(null);
-        this.loadHistory();
-        // odśwież kalendarz po zapisaniu nowego worklogu
-        this.refreshCalendarAndWorklogs();
+         this.issueSummary.set(null);
+         this.loadHistory();
+         // odśwież kalendarz po zapisaniu nowego worklogu
+         this.refreshCalendarAndWorklogs();
       },
       error: (err) => {
         console.error('Error saving worklog', err);
