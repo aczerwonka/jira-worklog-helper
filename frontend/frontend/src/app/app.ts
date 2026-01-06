@@ -816,10 +816,20 @@ export class App implements OnInit {
   }
 
   togglePrefixesEnabled(): void {
-    const newVal = !this.prefixesEnabled();
+    const oldVal = this.prefixesEnabled();
+    const newVal = !oldVal;
+    // optimistic UI update
+    this.prefixesEnabled.set(newVal);
     this.worklogService.setPrefixesEnabled(newVal).subscribe({
-      next: () => this.prefixesEnabled.set(newVal),
-      error: (err) => console.error('Failed to set prefixes enabled', err)
+      next: () => {
+        // server accepted — nothing more to do (UI already updated)
+      },
+      error: (err) => {
+        console.error('Failed to set prefixes enabled', err);
+        // rollback optimistic change
+        this.prefixesEnabled.set(oldVal);
+        this.showToast('Failed to update prefixes enabled: ' + (err.error?.message || err.message));
+      }
     });
   }
 

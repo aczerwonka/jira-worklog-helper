@@ -8,7 +8,17 @@
       </div>
       <div class="navbar-user">
         <button type="button" class="btn-prefixes" (click)="openPrefixesModal()">PREFIXES</button>
-        <span class="username">admin</span>
+        <button
+          type="button"
+          (click)="togglePrefixesEnabled()"
+          [attr.aria-pressed]="prefixesEnabled()"
+          style="margin-left:12px;padding:6px 10px;border-radius:6px;border:none;cursor:pointer;color:#fff;font-weight:600;font-size:14px"
+          [style.background]="prefixesEnabled() ? '#10B981' : '#6B7280'"
+          [title]="prefixesEnabled() ? 'Prefixes enabled' : 'Prefixes disabled'"
+        >
+          <span *ngIf="prefixesEnabled()">Prefixes: ON</span>
+          <span *ngIf="!prefixesEnabled()">Prefixes: OFF</span>
+        </button>
       </div>
     </div>
   </nav>

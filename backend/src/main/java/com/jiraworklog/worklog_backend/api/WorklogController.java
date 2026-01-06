@@ -173,9 +173,9 @@ public class WorklogController {
         return ResponseEntity.ok(prefixesService.isPrefixesEnabled());
     }
 
-//    @PutMapping("/api/prefixes/enabled")
-//    public ResponseEntity<Void> setPrefixesEnabled(@RequestBody Boolean enabled) {
-//        prefixesService.setPrefixesEnabled(enabled != null && enabled);
-//        return ResponseEntity.ok().build();
-//    }
+    @PutMapping("/api/prefixes/enabled")
+    public ResponseEntity<Void> setPrefixesEnabled(@RequestBody Boolean enabled) {
+        prefixesService.setPrefixesEnabled(enabled != null && enabled);
+        return ResponseEntity.ok().build();
+    }
 }

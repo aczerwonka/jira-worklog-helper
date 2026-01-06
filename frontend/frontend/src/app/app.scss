@@ -71,11 +71,16 @@ body, html {
   align-items: center;
   height: 100%;
   padding: 0 24px;
-  max-width: 1400px;
+  //max-width: 1400px;
   margin: 0 auto;
-  width: 100%
+  width: 100%;
 }
-
+.navbar-user {
+  display: flex;
+  align-items: center;
+  justify-content: right;
+  gap: 12px
+}
 .navbar .navbar-brand h1 {
   font-size: 20px;
   font-weight: 600;
@@ -86,7 +91,7 @@ body, html {
 .navbar .navbar-user .username {
   font-size: 14px;
   color: $text-secondary;
-  font-weight: 500
+  font-weight: 500;
 }
 
 .workspace {
