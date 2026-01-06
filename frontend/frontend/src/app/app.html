@@ -75,7 +75,10 @@
             <div class="days-grid">
               <div *ngFor="let dayObj of calendarDays()" class="day-cell"
                    (click)="selectCalendarDate(dayObj.date)"
-                   [class.other-month]="dayObj.date.getMonth() !== currentDate().getMonth()">
+                   [class.other-month]="dayObj.date.getMonth() !== currentDate().getMonth()"
+                   [style.backgroundColor]="isFormDate(dayObj.date) ? 'rgba(59,130,246,0.08)' : null"
+                   [style.border]="isFormDate(dayObj.date) ? '1px solid rgba(59,130,246,0.35)' : null"
+                   [style.borderRadius]="isFormDate(dayObj.date) ? '6px' : null">
                 <div class="day-number">{{ dayObj.date.getDate() }}</div>
                 <!--worklogs badges-->
                 <div class="day-total-badge" *ngIf="sumWorkTime(dayObj.worklogs)">
@@ -104,7 +107,10 @@
               </div>
               <div class="week-days">
                 <div *ngFor="let dayObj of getWeekDays()" class="week-day-card"
-                   (click)="selectCalendarDate(dayObj.date)">
+                   (click)="selectCalendarDate(dayObj.date)"
+                   [style.backgroundColor]="isFormDate(dayObj.date) ? 'rgba(59,130,246,0.08)' : null"
+                   [style.border]="isFormDate(dayObj.date) ? '1px solid rgba(59,130,246,0.35)' : null"
+                   [style.borderRadius]="isFormDate(dayObj.date) ? '6px' : null">
                 <div class="week-day-header">
                   <div class="day-name">{{ dayObj.date | date:'EEE':'' :'en-US' }}</div>
                   <div class="day-date">{{ dayObj.date | date:'MMM d':'' :'en-US' }}</div>

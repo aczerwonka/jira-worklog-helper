@@ -537,6 +537,17 @@ export class App implements OnInit {
     this.worklogForm.patchValue({ date: dateStr });
   }
 
+  // Returns true when given date matches the date currently set in the form (YYYY-MM-DD)
+  isFormDate(date: Date): boolean {
+    try {
+      const formDate = this.worklogForm?.get('date')?.value;
+      if (!formDate) return false;
+      return this.getDateString(date) === formDate;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Template helpers to safely extract fields from union types
   displayTicket(worklog: any): string {
     if (!worklog) return '';
