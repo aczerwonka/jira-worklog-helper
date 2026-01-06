@@ -647,7 +647,11 @@ export class App implements OnInit {
     });
 
     // update signals for UI (ticket and summary)
-    if (ticket) this.selectedTicket.set(ticket);
+    if (ticket) {
+      this.selectedTicket.set(ticket);
+      // fetch latest issue summary for this ticket so the form shows up-to-date summary
+      this.fetchIssueSummary(ticket);
+    }
     if (summary) this.selectedTicketSummary.set(summary);
 
     // set hour/minute signals based on seconds

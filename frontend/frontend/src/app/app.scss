@@ -344,13 +344,40 @@ body, html {
 }
 
 .summary-preview {
+  position: relative;
+  min-height: 36px; /* reserve a small fixed height so summary or loader doesn't change layout */
+  padding: 6px 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: block;
+}
+
+.summary-preview .summary-text {
+  font-size: 15px;
+  color: #3b82f6;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.summary-preview .loading-text {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 12px;
-  color: $primary-blue;
-  margin-top: 6px;
-  padding: 8px;
-  background-color: #f0f9ff;
-  border-radius: 4px;
-  border-left: 2px solid $primary-blue
+  color: #64748b;
+  transition: opacity 160ms ease-in-out, visibility 160ms;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.summary-preview .loading-text.visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 .tag-cloud {

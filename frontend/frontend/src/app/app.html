@@ -183,7 +183,6 @@
         <form [formGroup]="worklogForm" class="worklog-form">
           <!-- Favorites Section -->
           <div class="form-section">
-            <label class="section-label">Favorite Tickets</label>
             <div class="favorites-grid" *ngIf="favorites().length > 0">
               <button
                 type="button"
@@ -209,9 +208,10 @@
               (change)="onTicketKeyChange($any($event.target).value)"
               class="form-input"
             />
-            <div *ngIf="isLoadingSummary()" class="loading-text">Loading...</div>
-            <div *ngIf="selectedTicketSummary()" class="summary-preview">
-              {{ selectedTicketSummary() }}
+            <!-- always render placeholder to avoid layout jump; loader is absolutely positioned inside it -->
+            <div class="summary-preview">
+              <div class="loading-text" [class.visible]="isLoadingSummary()">Loading...</div>
+              <div class="summary-text">{{ selectedTicketSummary() }}</div>
             </div>
           </div>
 
